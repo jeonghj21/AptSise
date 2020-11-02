@@ -1,0 +1,169 @@
+# Raw 데이터 테이블
+create table aptsise (
+id int not null,
+price int not null,
+made_year int not null,
+year int  not null,
+road_name varchar(255) null,
+road_bldg_pri varchar(5),
+road_bldg_sec varchar(5),
+road_region_cd varchar(5),
+road_seq varchar(2),
+road_base_cd varchar(2),
+road_cd varchar(7),
+dong varchar(255) not null,
+dong_pri varchar(4),
+dong_sec varchar(4),
+dong_region1_cd varchar(5),
+dong_region2_cd varchar(5),
+dong_jibun varchar(2),
+apt_name varchar(255) not null,
+month int not null,
+day int not null,
+seq varchar(20) not null,
+area double not null,
+jibun varchar(20) ,
+region varchar(5) not null,
+floor int,
+qrt int,
+yyyyqrt varchar(6),
+primary key (region, id)
+);
+
+# 전처리된 데이터 테이블
+create table apt_sale (
+id int not null auto_increment,
+price int not null,
+saled datetime,
+area double not null,
+floor int,
+apt_id int,
+primary key (id)
+);
+
+# 초기 데이터 업로드
+LOAD DATA INFILE '/home/jhj/sisedata/apt-11110-load.csv'
+INTO TABLE aptsise
+FIELDS TERMINATED BY ',' 
+LINES TERMINATED BY '\n' 
+IGNORE 1 ROWS
+;
+
+# 아파트 마스터 테이블
+create table apt_master (
+id int not null auto_increment, 
+apt_name varchar(255) not null, 
+region varchar(5) not null, 
+road_name varchar(255), 
+road_bldg_pri varchar(5), 
+road_bldg_sec varchar(5), 
+road_region_cd varchar(5), 
+road_seq varchar(2), 
+road_base_cd varchar(2), 
+road_cd varchar(7), 
+dong varchar(255), 
+dong_pri varchar(4), 
+dong_sec varchar(4), 
+dong_region1_cd varchar(5), 
+dong_region2_cd varchar(5), 
+dong_jibun varchar(2), jibun varchar(20), primary key (id));
+
+# 초기 테이블에서 아파트 마스터 테이블 생성
+insert into apt_master 
+    select NULL
+           , apt_name
+           , region
+           , road_name
+           , road_bldg_pri
+           , road_bldg_sec
+           , road_region_cd
+           , road_seq
+           , road_base_cd
+           , road_cd, dong
+           , dong_pri
+           , dong_sec
+           , dong_region1_cd
+           , dong_region2_cd
+           , dong_jibun
+           , jibun 
+    from aptsise 
+   group by apt_name
+           , region
+           , road_name
+           , road_bldg_pri
+           , road_bldg_sec
+           , road_region_cd
+           , road_seq
+           , road_base_cd
+           , road_cd, dong
+           , dong_pri
+           , dong_sec
+           , dong_region1_cd
+           , dong_region2_cd
+           , dong_jibun
+           , jibun ;
+
+
+SELECT * FROM apt_master 
+INTO OUTFILE '/home/jhj/sisedata/apt_master.csv'
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+;
+
+# 초기 테이블에 아파트 마스터 연계용 컬럼 추가
+alter table aptsise add column apt_id int ;
+
+# 초기 테이블에 아파트 마스터 연계용 컬럼 업데이트
+update aptsise a, apt_master b set a.apt_id = b.id
+ where a.apt_name = b.apt_name 
+    and a.region = b.region 
+    and a.road_name = b.road_name 
+    and a.road_bldg_pri = b.road_bldg_pri 
+    and a.road_bldg_sec = b.road_bldg_sec 
+    and a.road_region_cd = b.road_region_cd 
+    and a.road_seq = b.road_seq 
+    and a.road_base_cd = b.road_base_cd 
+    and a.road_cd = b.road_cd 
+    and a.dong = b.dong 
+    and a.dong_pri = b.dong_pri 
+    and a.dong_sec = b.dong_sec 
+    and a.dong_region1_cd = b.dong_region1_cd 
+    and a.dong_region2_cd = b.dong_region2_cd 
+    and a.dong_jibun = b.dong_jibun 
+    and a.jibun = b.jibun;
+
+# 아파트 실거래 테이블에 인덱스 추가
+alter table apt_sale add index apt_id_idx (apt_id);
+
+# 동 마스터 테이블 생성
+create table dong_master (
+    dong_cd char(5) not null, 
+    region_cd char(5) not null, 
+    dong_name varchar(255) not null, 
+    primary key (dong_cd, region_cd)
+);
+
+insert into dong_master 
+    select dong_region1_cd, 
+            dong_region2_cd, 
+            dong 
+     from apt_master 
+   group by dong_region1_cd, dong_region2_cd, dong;
+
+insert into apt_sale 
+    select NULL, 
+            price, 
+            str_to_date(concat(year, lpad(month, 2, '0'), day),'%Y%m%d') , 
+            area, 
+            floor, 
+            apt_id 
+     from aptsise;
+
+alter table apt_sale add constraint apt_sale_fk foreign key(apt_id) references apt_master(id);
+
+LOAD DATA INFILE '/home/jhj/dong.csv'
+INTO TABLE apt_dong
+FIELDS TERMINATED BY ',' 
+LINES TERMINATED BY '\n' 
+IGNORE 1 ROWS
+;
