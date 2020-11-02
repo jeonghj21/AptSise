@@ -1,0 +1,63 @@
+<!-- Sidebar -->
+<script>
+var regions = [];
+var dongs = {};
+
+function constructSel(sel, data) {
+  sel.innerHTML = "";
+  var option = document.createElement("option");
+  option.value = 'all';
+  option.innerText = 'All';
+  sel.appendChild(option);
+  $.each(data, function(idx, r) {
+      option = document.createElement("option");
+      option.value = r[0];
+      option.innerText = r[1];
+      sel.appendChild(option);
+  });
+}
+
+function initRegions() {
+  sel = document.getElementById("region");
+  constructSel(sel, regions);
+}
+
+$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
+        list = JSON.parse(data);
+        regions = list[0];
+        dongs = list[1];
+        initRegions();
+});
+
+function refreshDong(val) {
+  sel = document.getElementById("dong");
+  constructSel(sel, dongs[val]);
+}
+
+function refreshApt(val) {
+  sel = document.getElementById("apt");
+  region = document.getElementById("region").value;
+  dong = document.getElementById("dong").value;
+  url = "{{ config['BASE_URL'] }}getApt?region="+region+"&dong="+dong;
+  $.getJSON(url, function(data){
+        list = JSON.parse(data);
+        constructSel(sel, list);
+  });
+}
+</script>
+<div class="w3-sidebar w3-light-grey w3-bar-block" style="width:200px; margin-left:30px;">
+  <h3 class="w3-bar-item">아파트 선택</h3>
+  <label>구 선택:</label><br>
+  <select onchange="refreshDong(this.value)" name="region" id="region" style="width:100%;">
+    <option value="all">all</option>
+  </select><br><br>
+  <label>동 선택:</label><br>
+  <select onchange="refreshApt(this.value)" name="dong" id="dong" style="width:100%;">
+    <option value="all">All</option>
+  </select><br><br>
+  <label>아파트 선택:</label><br>
+  <select onchange="drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
+  </select>
+  <br>
+</div>
+

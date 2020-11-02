@@ -1,0 +1,77 @@
+<script>
+var myChart = null;
+var defaultDataset = [{
+                fillColor : "rbga(151,187,205,0.2)",
+                strokeColor : "rbga(151,187,205,1)",
+                pointColor : "rbga(151,187,205,1)",
+                pointStrokeColor : "#fff",
+                pointHighlightFill : "#fff",
+                pointHighlightStroke : "rbga(151,187,205,1)"
+            }];
+
+var defaultOptions = {
+  scales: {
+    yAxes: [{
+      id: 'A',
+      type: 'linear',
+      position: 'left',
+    }, {
+      id: 'B',
+      type: 'linear',
+      position: 'right',
+    }]
+  }
+};
+
+function drawChart(title, labels, data){
+  var ctx = document.getElementById("myChart").getContext("2d");
+  if (myChart != null) {
+    myChart.destroy();
+  }
+  myChart = new Chart (ctx, {
+    type: 'line',
+    data: {
+      labels : labels,
+      datasets : [{ 
+        label: '평당 평균가',
+        yAxisID: 'A',
+        pointColor: 'blue',
+        strokeColor: 'blue',
+        data: data,
+        spanGaps: true
+      }]
+    },
+    options : {
+      scales: {
+        yAxes: [{
+          id: 'A',
+          type: 'linear',
+          position: 'left'
+        }]
+      }
+    }
+  }); 
+}
+
+</script>
+
+{% include 'style.html' %}
+{% include 'container.html' %}
+<div style='width:100%; margin:20px;'>
+    <canvas id="myChart"></canvas>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+<script>
+
+function drawSaleLineChart(apt, title) {
+  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
+    data = JSON.parse(jsonData);
+    drawChart(title, data['labels'], data['data']);
+  });
+
+}
+
+</script>
+{% include 'bottom.html' %}
+
