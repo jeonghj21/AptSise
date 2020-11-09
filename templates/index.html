@@ -51,6 +51,19 @@ function drawChart(title, labels, data){
       }
     }
   }); 
+
+  document.getElementById("myChart").onclick = function(evt) {
+    var activePoint = myChart.getElementAtEvent(event);
+
+    // make sure click was on an actual point
+    if (activePoint.length > 0) {
+      var clickedDatasetIndex = activePoint[0]._datasetIndex;
+      var clickedElementindex = activePoint[0]._index;
+      var label = myChart.data.labels[clickedElementindex];
+      var value = myChart.data.datasets[clickedDatasetIndex].data[clickedElementindex];     
+      alert("Clicked: " + label + " - " + value);
+    }
+  };
 }
 
 </script>
