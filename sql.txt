@@ -167,3 +167,16 @@ FIELDS TERMINATED BY ','
 LINES TERMINATED BY '\n' 
 IGNORE 1 ROWS
 ;
+
+alter table apt_sale add area_type varchar(2);
+
+update apt_sale set area_type = case when area <=42 then '00' when area>42 and area<85 then '01' when area>=85 and area<128 then '02' when area>=128 an
+d area<180 then '03' when area>=180 then '04' end;
+
+create table code_1 (cd_grp varchar(2) not null, cd varchar(2) not null, name varchar(255) not null, memo varchar(255), primary key (cd_grp, cd));
+
+create table area_type_avg as select area_type, year(saled) as year, month(saled) as month, round(avg(price),0) as avg_price from apt_sale group by area_type, year(saled), month(saled);
+
+alter table area_type_avg add constraint primary key area_type_avg_pk(area_type,year,month);
+
+
