@@ -47,12 +47,23 @@ function refreshApt(val) {
 </script>
 <div class="w3-sidebar w3-light-grey w3-bar-block" style="width:200px; margin-left:30px;">
   <h3 class="w3-bar-item">아파트 선택</h3>
-  <label>구 선택:</label><br>
-  <select onchange="refreshDong(this.value)" name="region" id="region" style="width:100%;">
+  <label>기간:</label><input id=from_ym maxlength=6 size=6 style="width:70px;"> ~ <input id=to_ym maxlength=6 size=6 style="width:70px;"><br>
+  <label>연한:</label>
+    <select id=ages>
+      <option value=all>ALL</option>
+      <option value=3>3년 이내</option>
+      <option value=6>6년 이내</option>
+      <option value=10>10년 이내</option>
+      <option value=15>15년 이내</option>
+      <option value=20>20년 이내</option>
+      <option value=20+>20년 이상</option>
+    </select>><br>
+  <label>구:</label><button id='region_btn' onclick="drawRegionSaleStat(document.all.region.value, document.all.region.options[document.all.region.selectedIndex].innerText);" disabled>평균 평단가 조회</button><br>
+  <select onchange="if(this.value=='all') document.all.region_btn.disabled=true; else document.all.region_btn.disabled=false; refreshDong(this.value)" name="region" id="region" style="width:100%;">
     <option value="all">all</option>
   </select><br><br>
-  <label>동 선택:</label><br>
-  <select onchange="refreshApt(this.value)" name="dong" id="dong" style="width:100%;">
+  <label>동:</label><button id='dong_btn' onclick="drawDongSaleStat(document.all.region.value+document.all.dong.value,  document.all.dong.options[document.all.dong.selectedIndex].innerText);" disabled>평균 평단가 조회</button><br>
+  <select onchange="if(this.value=='all') document.all.dong_btn.disabled=true; else document.all.dong_btn.disabled=false; refreshApt(this.value)" name="dong" id="dong" style="width:100%;">
     <option value="all">All</option>
   </select><br><br>
   <label>아파트 선택:</label><br>
@@ -60,4 +71,3 @@ function refreshApt(val) {
   </select>
   <br>
 </div>
-

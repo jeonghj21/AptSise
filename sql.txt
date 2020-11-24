@@ -173,10 +173,17 @@ alter table apt_sale add area_type varchar(2);
 update apt_sale set area_type = case when area <=42 then '00' when area>42 and area<85 then '01' when area>=85 and area<128 then '02' when area>=128 an
 d area<180 then '03' when area>=180 then '04' end;
 
-create table code_1 (cd_grp varchar(2) not null, cd varchar(2) not null, name varchar(255) not null, memo varchar(255), primary key (cd_grp, cd));
+create table apt_sale_stats as select '01' as stat_type, area_type as stat_type_key, year(saled) as year, month(saled) as month, round(avg(price/(area/3.3)),0) as unit_price, count(*) as cnt from apt_sale group by area_type, year(saled), month(saled);
 
-create table area_type_avg as select area_type, year(saled) as year, month(saled) as month, round(avg(price),0) as avg_price from apt_sale group by area_type, year(saled), month(saled);
+alter table apt_sale_stats add constraint primary key apt_sale_stats_pk(stat_type, stat_type_key,year,month);
 
-alter table area_type_avg add constraint primary key area_type_avg_pk(area_type,year,month);
+alter table apt_sale_stats modify stat_type_key varchar(10) not null;
 
+insert into apt_sale_stats select '02', dong_region1_cd, year(saled), month(saled), round(avg(price/(area/3.3)),0), count(*) from apt_sale s, apt_master m where s.apt_id = m.id group by m.dong_region1_cd, year(saled), month(saled);
+
+insert into apt_sale_stats select '03', concat(dong_region1_cd,dong_region2_cd), year(saled), month(saled), round(avg(price/(area/3.3)),0), count(*) from apt_sale s, apt_master m where s.apt_id = m.id group by concat(m.dong_region1_cd,dong_region2_cd), year (saled), month(saled);
+
+alter table apt_master add made_year int;
+
+update apt_master a set made_year = (select made_year from jhj.aptsise where apt_id = a.id limit 1);
 

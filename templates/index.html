@@ -33,7 +33,7 @@ function drawChart(title, labels, data){
     data: {
       labels : labels,
       datasets : [{ 
-        label: '평당 평균가',
+        label: '평단가 - ' + title,
         yAxisID: 'A',
         pointColor: 'blue',
         strokeColor: 'blue',
@@ -83,6 +83,20 @@ function drawSaleLineChart(apt, title) {
     drawChart(title, data['labels'], data['data']);
   });
 
+}
+
+function drawRegionSaleStat(region, title) {
+  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?type=02&key="+region, function(jsonData){
+    data = JSON.parse(jsonData);
+    drawChart(title, data['labels'], data['data']);
+  });
+}
+
+function drawDongSaleStat(dong, title) {
+  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?type=03&key="+dong, function(jsonData){
+    data = JSON.parse(jsonData);
+    drawChart(title, data['labels'], data['data']);
+  });
 }
 
 </script>

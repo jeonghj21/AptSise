@@ -28,7 +28,7 @@ def getSale():
         result = connection.execute(text(sql))
 
     rows=result.fetchall()            
-    json_data = { 'labels': [], 'data':[] }
+    json_data = { 'labels': [], 'data':[], 'rawData':{} }
     min_ym = ''
     max_ym = ''
     ym_price = {}
@@ -53,6 +53,22 @@ def getSale():
         else:
             mm = mm + 1
         min_ym = str(yy) + str(mm).zfill(2)
+
+    sql = "select date_format(saled, '%Y%m') ym, price, area, floor"
+    sql += " from apt_sale s"
+    sql += " where apt_id=" + apt
+    sql += " order by saled"
+    with app.engine.connect() as connection:
+        result = connection.execute(text(sql))
+
+    rows=result.fetchall()            
+    ym_raws = {}
+    ym_raw = []
+    for r in rows:
+        if ym_raws.__contains__(r['ym']):
+            ym_raw = ym_raws[r['ym']]
+        ym_raw.append({ 'area': r['area'], 'floor': r['floor'], 'price': r['price'] })
+        ym_raws[r['ym']] = ym_raw
 
     json_return=json.dumps(json_data)   #string #json
  
@@ -117,7 +133,8 @@ def getApt():
     region = params['region']
     dong = params['dong']
 
-    sql = "select id, apt_name from apt_master"
+    sql = "select id, apt_name"
+    sql += "  from apt_master"
     sql += " where dong_region1_cd = '" + region + "'"
     sql += "   and dong_region2_cd = '" + dong + "'"
     sql += " order by apt_name"
@@ -131,3 +148,31 @@ def getApt():
     json_return=json.dumps(data)   #string #json
  
     return jsonify(json_return)
+
+@app.route("/getSaleStat")
+def getSaleStat():
+    params = request.args.to_dict()
+    type = params['type']
+    key = params['key']
+
+    sql = "select year, lpad(month,2, '0') as month, unit_price, cnt"
+    sql += " from apt_sale_stats s"
+    sql += " where stat_type='" + type + "'"
+    sql += "   and stat_type_key='" + key + "'"
+    sql += " order by year, month"
+    print(sql)
+    with app.engine.connect() as connection:
+        result = connection.execute(text(sql))
+
+    rows=result.fetchall()            
+    json_data = { 'labels': [], 'data':[] }
+
+    for r in rows:
+        json_data['labels'].append(str(r['year']) + r['month'])
+        json_data['data'].append(int(r['unit_price']))
+
+    json_return=json.dumps(json_data)   #string #json
+ 
+    return jsonify(json_return)
+
+
