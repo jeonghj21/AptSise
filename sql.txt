@@ -173,15 +173,16 @@ alter table apt_sale add area_type varchar(2);
 update apt_sale set area_type = case when area <=42 then '00' when area>42 and area<85 then '01' when area>=85 and area<128 then '02' when area>=128 an
 d area<180 then '03' when area>=180 then '04' end;
 
-create table apt_sale_stats as select '01' as stat_type, area_type as stat_type_key, year(saled) as year, month(saled) as month, round(avg(price/(area/3.3)),0) as unit_price, count(*) as cnt from apt_sale group by area_type, year(saled), month(saled);
+create table apt_sale_stats (region char(5) not null, dong char(5) not null, ages int not null, area char(2) not null, ym char(6) not null, unit_price integer not null, cnt integer not null, primary key(region, dong, ages, area, ym));
 
-alter table apt_sale_stats add constraint primary key apt_sale_stats_pk(stat_type, stat_type_key,year,month);
+alter table apt_sale add ym char(4);
 
-alter table apt_sale_stats modify stat_type_key varchar(10) not null;
+update apt_sale set ym = concat(year(saled),lpad(month(saled),2,'0'));
 
-insert into apt_sale_stats select '02', dong_region1_cd, year(saled), month(saled), round(avg(price/(area/3.3)),0), count(*) from apt_sale s, apt_master m where s.apt_id = m.id group by m.dong_region1_cd, year(saled), month(saled);
+insert into apt_sale_stats select dong_region1_cd, dong_region2_cd, year(now())-made_year+1, area_type, ym, avg(price/(area/3.3)), count(*) from apt_sale a, apt_master b where a.apt_id = b.id group by dong_region1_cd, dong_region2_cd, year(now())-made_year+1, area_type, ym;
 
-insert into apt_sale_stats select '03', concat(dong_region1_cd,dong_region2_cd), year(saled), month(saled), round(avg(price/(area/3.3)),0), count(*) from apt_sale s, apt_master m where s.apt_id = m.id group by concat(m.dong_region1_cd,dong_region2_cd), year (saled), month(saled);
+insert into apt_sale_stats select dong_region1_cd, dong_region2_cd, year(now())-made_year+1, area_type, concat(year(saled),lpad(month(saled),2,'0')), avg(price/(area/3.3)), count(*) from apt_sale a, apt_master b where a.apt_id = b.id group by dong_region1_cd, dong_region2_cd, year(now())-made_year+1, area_type, saled;
+
 
 alter table apt_master add made_year int;
 
