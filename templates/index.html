@@ -61,7 +61,6 @@ function drawChart(title, labels, data){
       var clickedElementindex = activePoint[0]._index;
       var label = myChart.data.labels[clickedElementindex];
       var value = myChart.data.datasets[clickedDatasetIndex].data[clickedElementindex];     
-      alert("Clicked: " + label + " - " + value);
     }
   };
 }
@@ -85,15 +84,18 @@ function drawSaleLineChart(apt, title) {
 
 }
 
-function drawRegionSaleStat(region, title) {
-  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?type=02&key="+region, function(jsonData){
-    data = JSON.parse(jsonData);
-    drawChart(title, data['labels'], data['data']);
-  });
-}
+function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
+  params = "from_ym=" + from_ym;
+  params += "&to_ym=" + to_ym;
+  params += "&ages=" + ages;
+  params += "&age_sign=" + age_sign;
+  params += "&area_type=" + area_type;
+  params += "&region=" + region;
+  params += "&dong=" + dong;
 
-function drawDongSaleStat(dong, title) {
-  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?type=03&key="+dong, function(jsonData){
+  alert(params);
+
+  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
     data = JSON.parse(jsonData);
     drawChart(title, data['labels'], data['data']);
   });

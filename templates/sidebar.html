@@ -23,7 +23,6 @@ function initRegions() {
 }
 
 $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
-	alert(data);
         list = JSON.parse(data);
         regions = list[0];
         dongs = list[1];
@@ -45,6 +44,26 @@ function refreshApt(val) {
         constructSel(sel, list);
   });
 }
+
+function requestSaleStat(isRegion) {
+  from_ym = $('input#from_ym').val();
+  to_ym = $('input#to_ym').val();
+  ages = $('select#ages').val();
+  age_sign = $('select#age_sign').val();
+  area_type = $('select#area_type').val();
+  region = $('select#region').val();
+  if (isRegion) {
+    dong = "";
+    title = document.all.region.options[document.all.region.selectedIndex].innerText);
+  } else {
+    dong = $('select#dong').val();
+    title = document.all.dong.options[document.all.dong.selectedIndex].innerText);
+  }
+  drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
+
+}
+
+
 </script>
 <div class="w3-sidebar w3-light-grey w3-bar-block" style="width:200px; margin-left:30px;">
   <h3 class="w3-bar-item">아파트 선택</h3>
@@ -69,11 +88,11 @@ function refreshApt(val) {
       <option value=03>180제곱미터 미만</option>
       <option value=04>180제곱미터 이상</option>
     </select><br>
-  <label>구:</label><button id='region_btn' onclick="drawRegionSaleStat(document.all.region.value, document.all.region.options[document.all.region.selectedIndex].innerText);" disabled>평균 평단가 조회</button><br>
+  <label>구 : </label><button id='region_btn' onclick="requestSaleStat(true);" disabled>평균 평단가 조회</button><br>
   <select onchange="if(this.value=='all') document.all.region_btn.disabled=true; else document.all.region_btn.disabled=false; refreshDong(this.value)" name="region" id="region" style="width:100%;">
     <option value="all">all</option>
   </select><br><br>
-  <label>동:</label><button id='dong_btn' onclick="drawDongSaleStat(document.all.region.value+document.all.dong.value,  document.all.dong.options[document.all.dong.selectedIndex].innerText);" disabled>평균 평단가 조회</button><br>
+  <label>동 : </label><button id='dong_btn' onclick="requestSaleStat(false);" disabled>평균 평단가 조회</button><br>
   <select onchange="if(this.value=='all') document.all.dong_btn.disabled=true; else document.all.dong_btn.disabled=false; refreshApt(this.value)" name="dong" id="dong" style="width:100%;">
     <option value="all">All</option>
   </select><br><br>
