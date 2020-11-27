@@ -1,6 +1,7 @@
 from flask import Flask, request, render_template, json, jsonify
 from sqlalchemy import create_engine, text
 from json import JSONEncoder
+from datetime import date
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
@@ -120,7 +121,8 @@ def getDong():
             dongs_in_r.append([res['dong_cd'], res['dong_name']])
         dongs[r[0]] = dongs_in_r
 
-    data.append(dongs);
+    print(len(regions))
+    data.append(dongs)
     
     json_return=json.dumps(data)   #string #json
  
@@ -152,14 +154,30 @@ def getApt():
 @app.route("/getSaleStat")
 def getSaleStat():
     params = request.args.to_dict()
-    type = params['type']
-    key = params['key']
+    from_ym = params['from_ym']
+    to_ym = params['to_ym']
+    region = params['region']
+    dong = params['dong']
+    area_type = params['area_type']
+    ages = params['ages']
+    age_sign = params['age_sign']
 
-    sql = "select year, lpad(month,2, '0') as month, unit_price, cnt"
-    sql += " from apt_sale_stats s"
-    sql += " where stat_type='" + type + "'"
-    sql += "   and stat_type_key='" + key + "'"
-    sql += " order by year, month"
+    sql = "select avg(unit_price) unit_price, sun(cnt) cnt from("
+    sql += " select * from apt_sale_stats where 1 = 1"
+    if from_ym != "":
+        sql += " and ym >= '" + from_yme + "'"
+    if to_ym != "":
+        sql += " and ym <= '" + to_yme + "'"
+    if region != "":
+        sql += " and region = '" + region + "'"
+    if dong != "":
+        sql += " and dong = '" + dong + "'"
+    if area_type != "":
+        sql += " and area_type = '" + area_type + "'"
+    if ages != "" and age_sign != "":
+        sql += " and made_year " + age_sign + " " + (date.today().year - int(ages) + 1)
+    sql += " group by ym"
+    sql += " order by ym"
     print(sql)
     with app.engine.connect() as connection:
         result = connection.execute(text(sql))
@@ -168,8 +186,8 @@ def getSaleStat():
     json_data = { 'labels': [], 'data':[] }
 
     for r in rows:
-        json_data['labels'].append(str(r['year']) + r['month'])
-        json_data['data'].append(int(r['unit_price']))
+        json_data['labels'].append(r['ym'])
+        json_data['data'].append(r['unit_price'])
 
     json_return=json.dumps(json_data)   #string #json
  
