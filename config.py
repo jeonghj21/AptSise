@@ -8,4 +8,4 @@ db = {
 
 DB_URL = f"mysql+mysqlconnector://{db['user']}:{db['password']}@{db['host']}:{db['port']}/{db['database']}?charset=utf8" 
 
-BASE_URL = "http://localhost:5000/"
+BASE_URL = "http://www.aptsise.kr/"

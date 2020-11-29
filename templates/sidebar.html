@@ -54,10 +54,10 @@ function requestSaleStat(isRegion) {
   region = $('select#region').val();
   if (isRegion) {
     dong = "";
-    title = document.all.region.options[document.all.region.selectedIndex].innerText);
+    title = $('select#region option:checked').text();
   } else {
     dong = $('select#dong').val();
-    title = document.all.dong.options[document.all.dong.selectedIndex].innerText);
+    title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
   }
   drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
 

@@ -93,7 +93,25 @@ function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, t
   params += "&region=" + region;
   params += "&dong=" + dong;
 
-  alert(params);
+  if (from_ym + to_ym + ages + area_type != "") {
+    needsComma = false;
+    title += " (";
+    if (from_ym + to_ym != ""){
+      title += "기간 : " + from_ym + " ~ " + to_ym;
+      needsComma = true;
+    }
+    if (ages != ""){
+      if (needsComma) title += ", ";
+      title += "연식 : " + ages + " 년 " + (age_sign == '<' ? "이내" : "이상");
+      needsComma = true;
+    }
+    if (area_type != ""){
+      if (needsComma) title += ", ";
+      title += "전용면적 : " + (area_type == '00' ? "42" : (area_type == '01' ? "84" : (area_type == '02' ? "128" : (area_type == '03' ? "180" : "180 제곱미터 초과"))))
+      if (title.slice(-2) != "초과") title += " 제곱미터 이하";
+    }
+    title += ")";
+  }
 
   $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
     data = JSON.parse(jsonData);

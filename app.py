@@ -12,6 +12,31 @@ app.engine = create_engine(app.config['DB_URL'], encoding = 'utf-8')
 def index():
     return render_template('index.html')
     
+def spreadDataForYM(rows, ym_label, data_label, data, labels):
+    min_ym = ''
+    max_ym = ''
+    ym_data = {}
+    for r in rows:
+        ym = r[ym_label]
+        if min_ym == '': 
+            min_ym = ym
+        max_ym = ym
+        ym_data[ym] = r[data_label]
+    
+    while min_ym <= max_ym:
+        labels.append(min_ym)
+        if ym_data.__contains__(min_ym):
+            data.append(ym_data[min_ym])
+        else:
+            data.append(None)
+        yy = int(min_ym[:4])
+        mm = int(min_ym[4:6])
+        if mm == 12:
+            yy = yy + 1
+            mm = 1
+        else:
+            mm = mm + 1
+        min_ym = str(yy) + str(mm).zfill(2)
 
 @app.route("/getSale")
 def getSale():
@@ -30,30 +55,8 @@ def getSale():
 
     rows=result.fetchall()            
     json_data = { 'labels': [], 'data':[], 'rawData':{} }
-    min_ym = ''
-    max_ym = ''
-    ym_price = {}
-    for r in rows:
-        ym = r['ym']
-        if min_ym == '': 
-            min_ym = ym
-        max_ym = ym
-        ym_price[ym] = r['price']
-    
-    while min_ym <= max_ym:
-        json_data['labels'].append(min_ym)
-        if ym_price.__contains__(min_ym):
-            json_data['data'].append(ym_price[min_ym])
-        else:
-            json_data['data'].append(None)
-        yy = int(min_ym[:4])
-        mm = int(min_ym[4:6])
-        if mm == 12:
-            yy = yy + 1
-            mm = 1
-        else:
-            mm = mm + 1
-        min_ym = str(yy) + str(mm).zfill(2)
+
+    spreadDataForYM(rows, 'ym', 'price', json_data['data'], json_data['labels'])
 
     sql = "select date_format(saled, '%Y%m') ym, price, area, floor"
     sql += " from apt_sale s"
@@ -162,12 +165,12 @@ def getSaleStat():
     ages = params['ages']
     age_sign = params['age_sign']
 
-    sql = "select avg(unit_price) unit_price, sun(cnt) cnt from("
+    sql = " select ym, cast(round(avg(unit_price), 0) as signed) unit_price, sum(cnt) cnt from("
     sql += " select * from apt_sale_stats where 1 = 1"
     if from_ym != "":
-        sql += " and ym >= '" + from_yme + "'"
+        sql += " and ym >= '" + from_ym + "'"
     if to_ym != "":
-        sql += " and ym <= '" + to_yme + "'"
+        sql += " and ym <= '" + to_ym + "'"
     if region != "":
         sql += " and region = '" + region + "'"
     if dong != "":
@@ -175,8 +178,8 @@ def getSaleStat():
     if area_type != "":
         sql += " and area_type = '" + area_type + "'"
     if ages != "" and age_sign != "":
-        sql += " and made_year " + age_sign + " " + (date.today().year - int(ages) + 1)
-    sql += " group by ym"
+        sql += " and " + str(date.today().year - int(ages)) + age_sign + " made_year"
+    sql += " ) a  group by ym"
     sql += " order by ym"
     print(sql)
     with app.engine.connect() as connection:
@@ -185,9 +188,7 @@ def getSaleStat():
     rows=result.fetchall()            
     json_data = { 'labels': [], 'data':[] }
 
-    for r in rows:
-        json_data['labels'].append(r['ym'])
-        json_data['data'].append(r['unit_price'])
+    spreadDataForYM(rows, 'ym', 'unit_price', json_data['data'], json_data['labels'])
 
     json_return=json.dumps(json_data)   #string #json
  
