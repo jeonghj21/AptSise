@@ -170,9 +170,9 @@ IGNORE 1 ROWS
 
 alter table apt_sale add area_type varchar(2);
 
-update apt_sale set area_type = case when area <=42 then '00' when area>42 and area<85 then '01' when area>=85 and area<128 then '02' when area>=128 and area<180 then '03' when area>=180 then '04' end;
 
-create table apt_sale_stats (region char(5) not null, dong char(5) not null, made_year int not null, area_type char(2) not null, ym char(6) not null, unit_price integer not null, cnt integer not null, primary key(region, dong, ages, area, ym));
+update apt_sale set area_type = case when area <= 60 then '01' when area>60 and area<=85 then '02' when area>85 and area<=135 then '03' when area>135 then '04' end;
+
 
 update apt_sale set ym = concat(year(saled),lpad(month(saled),2,'0'));
 
@@ -180,6 +180,34 @@ alter table apt_master add made_year int;
 
 update apt_master a set made_year = (select made_year from jhj.aptsise where apt_id = a.id limit 1);
 
+create table apt_sale_stats (region char(5) not null, dong char(5) not null, made_year int not null, area_type char(2) not null, ym char(6) not null, unit_price integer not null, cnt integer not null, primary key(region, dong, made_year, area_type, ym));
+
 insert into apt_sale_stats select dong_region1_cd, dong_region2_cd, made_year, area_type, ym, avg(price/(area/3.3)), count(*) from apt_sale a, apt_master b where a.apt_id = b.id group by dong_region1_cd, dong_region2_cd, made_year, area_type, ym;
 
+update apt_sale set apt_id = 1356 where apt_id=1563;
+delete from apt_master where id=1563;
+delete from apt_master where id in (2062);
+update apt_sale set apt_id = 2244 where apt_id in (2062);
+delete from apt_master where id in (2119,2189);
+update apt_sale set apt_id = 2245 where apt_id in (2119,2189);
+
+create table tmp_apt_mapping (k_apt_id char(9), apt_id int);
+
+LOAD DATA INFILE '/tmp/mysql/k_apt_mapping.csv' INTO TABLE tmp_apt_mapping FIELDS TERMINATED BY ','  LINES TERMINATED BY '\n'  IGNORE 1 ROWS;
+alter table apt_master add k_apt_id char(9);
+update apt_master a set k_apt_id=(select k_apt_id from tmp_apt_mapping where apt_id=a.id);
+
+
+
+create table tmp_seoul_apt (k_apt_id char(9),name varchar(100),apt_type varchar(40),gu varchar(10),dong varchar(10),etc_addr varchar(100),road_name varchar(40),bldg_no varchar(10),own_type varchar(20),way_type varchar(20),heat_type varchar(20),dong_cnt int,family_cnt int,construct_co varchar(100),biz_co varchar(100),begin_dt date,area_01_cnt int,area_02_cnt int,area_03_cnt int,area_04_cnt int);
+
+LOAD DATA INFILE '/tmp/mysql/seoul_apt.csv' INTO TABLE tmp_seoul_apt FIELDS TERMINATED BY ','  LINES TERMINATED BY '\n'  IGNORE 1 ROWS;
+
+alter table tmp_seoul_apt add complete_dt date;
+
+update tmp_seoul_apt set complete_dt = str_to_date(substr(begin_dt,1,10), '%Y-%m-%d');
+
+create table access_log (ip varchar(20), dt datetime);
+
+create table tmp_dup_apt1 as select apt_name, region, road_name, road_bldg_pri, dong, k_apt_id, count(*) cnt from apt_master group by apt_name, region, road_name, road_bldg_pri, dong, dong_pri, dong_jibun, jibun, k_apt_id having count(*) > 1 ;
 

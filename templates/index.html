@@ -1,5 +1,8 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
 <script>
 var myChart = null;
+var overlay_chart = false;
+
 var defaultDataset = [{
                 fillColor : "rbga(151,187,205,0.2)",
                 strokeColor : "rbga(151,187,205,1)",
@@ -23,23 +26,22 @@ var defaultOptions = {
   }
 };
 
-function drawChart(title, labels, data){
+function showAptSaleTable(event, data) {
+  $("#aptSaleDiv").show();
+  $("#aptSaleDiv").css({top: event.pageY+'px', left: event.pageX+'px'});
+  $('#aptSaleTable > tbody:last').find("tr:gt(0)").remove();
+  $.each(data, function(idx, r) {
+    $('#aptSaleTable > tbody:last').append('<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td></tr>');
+  });
+}
+
+function createChart(title, labels) {
   var ctx = document.getElementById("myChart").getContext("2d");
-  if (myChart != null) {
-    myChart.destroy();
-  }
   myChart = new Chart (ctx, {
     type: 'line',
     data: {
       labels : labels,
-      datasets : [{ 
-        label: '평단가 - ' + title,
-        yAxisID: 'A',
-        pointColor: 'blue',
-        strokeColor: 'blue',
-        data: data,
-        spanGaps: true
-      }]
+      datasets : []
     },
     options : {
       scales: {
@@ -50,7 +52,7 @@ function drawChart(title, labels, data){
         }]
       }
     }
-  }); 
+  });
 
   document.getElementById("myChart").onclick = function(evt) {
     var activePoint = myChart.getElementAtEvent(event);
@@ -60,26 +62,151 @@ function drawChart(title, labels, data){
       var clickedDatasetIndex = activePoint[0]._datasetIndex;
       var clickedElementindex = activePoint[0]._index;
       var label = myChart.data.labels[clickedElementindex];
-      var value = myChart.data.datasets[clickedDatasetIndex].data[clickedElementindex];     
+      if (myChart.data.datasets[clickedDatasetIndex].key != null) {
+        apt = myChart.data.datasets[clickedDatasetIndex].key;
+        $.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt+"&ym="+label, function(jsonData){
+          data = JSON.parse(jsonData);
+          showAptSaleTable(evt, data);
+        });
+      }
     }
   };
+
 }
 
-</script>
+function clearChart() {
+  if (myChart != null) {
+    myChart.destroy();
+    myChart = null;
+  }
+}
 
-{% include 'style.html' %}
-{% include 'container.html' %}
-<div style='width:100%; margin:20px;'>
-    <canvas id="myChart"></canvas>
-</div>
+function getMonths(ym1, ym2) {
+  var min_ym, max_ym;
+  if (ym1 < ym2) {
+    min_ym = ym1;
+    max_ym = ym2;
+  } else {
+    min_ym = ym2;
+    max_ym = ym1;
+  }
+  var years = parseInt(max_ym.substr(0, 4)) - parseInt(min_ym.substr(0, 4));
+  var months = parseInt(max_ym.substr(4, 2)) - parseInt(min_ym.substr(4, 2));
+  return years * 12 + months;
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
-<script>
+}
+
+function lpadData(ym1, ym2, data) {
+
+  var months = getMonths(ym1, ym2);
+  for(var i = 0; i < months; i++) {
+    data.unshift(null);
+  }
+
+}
+
+function rpadData(ym1, ym2, data) {
+
+  var months = getMonths(ym1, ym2);
+  for(var i = 0; i < months; i++) {
+    data.push(null);
+  }
+}
+
+function lpadLabels(minYm, labels) {
+  while (labels[0] > minYm) {
+    var year = parseInt(labels[0].substr(0, 4));
+    var mm = parseInt(labels[0].substr(4, 2));
+    mm = mm - 1;
+    if (mm == 0) {
+      year = year - 1;
+      mm = 12;
+    }
+    labels.unshift(year.toString() + (mm < 10 ? "0"+mm.toString() : mm.toString()));
+  }
+}
+
+function rpadLabels(maxYm, labels) {
+  while (labels[labels.length-1] < maxYm) {
+    var year = parseInt(labels[labels.length-1].substr(0, 4));
+    var mm = parseInt(labels[labels.length-1].substr(4, 2));
+    mm = mm + 1;
+    if (mm > 12) {
+      year = year + 1;
+      mm = 1;
+    }
+    labels.push(year.toString() + (mm < 10 ? "0"+mm.toString() : mm.toString()));
+  }
+}
+
+function drawChart(title, labels, data, key){
+  if (!overlay_chart) {
+    clearChart();
+  }
+  if (myChart == null) {
+    createChart(title, labels);
+  }
+
+  if (myChart['data']['datasets'].length > 0) {
+    var chartLabels = myChart['data']['labels'];
+    if (chartLabels[0] < labels[0]) {
+      lpadData(chartLabels[0], labels[0], data);
+    } else if (chartLabels[0] > labels[0]) {
+      var chartDatasets = myChart['data']['datasets'];
+      for(var i = 0; i < chartDatasets.length; i++) {
+        lpadData(chartLabels[0], labels[0], chartDatasets[i].data);
+      }
+      lpadLabels(labels[0], chartLabels);
+    }
+    if (chartLabels[chartLabels.length-1] > labels[labels.length-1]) {
+      rpadData(chartLabels[chartLabels.length-1], labels[labels.length-1], data);
+    } else if (chartLabels[chartLabels.length-1] < labels[labels.length-1]) {
+      var chartDatasets = myChart['data']['datasets'];
+      for(var i = 0; i < chartDatasets.length; i++) {
+        rpadData(chartLabels[chartLabels.length-1], labels[labels.length-1], chartDatasets[i].data);
+      }
+      rpadLabels(labels[labels.length-1], chartLabels);
+    }
+  }
+
+  var dataset = {
+        label: title,
+        yAxisID: 'A',
+        pointColor: 'blue',
+        strokeColor: 'blue',
+        data: data,
+        spanGaps: true,
+        key : key
+      };
+
+  myChart['data']['datasets'].push(dataset);
+  myChart.update();
+
+}
+
+function existChartData(title) {
+  var exists = false;
+
+  if (myChart != null) {
+    for(var d in myChart['data']['datasets']) {
+      if (myChart['data']['datasets'][d].label == title) {
+        exists = true; 
+        break;
+      }
+    }
+  }
+  return exists;
+}
 
 function drawSaleLineChart(apt, title) {
+  if (overlay_chart && existChartData(title)) {
+    alert("이미 있는 차트입니다.");
+    return;
+  }
+
   $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
     data = JSON.parse(jsonData);
-    drawChart(title, data['labels'], data['data']);
+    drawChart(title, data['labels'], data['data'], apt);
   });
 
 }
@@ -107,10 +234,34 @@ function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, t
     }
     if (area_type != ""){
       if (needsComma) title += ", ";
-      title += "전용면적 : " + (area_type == '00' ? "42" : (area_type == '01' ? "84" : (area_type == '02' ? "128" : (area_type == '03' ? "180" : "180 제곱미터 초과"))))
-      if (title.slice(-2) != "초과") title += " 제곱미터 이하";
+      title += "전용면적 : ";
+      pos = 0;
+      do {
+        if (pos > 0) title += "|";
+        switch (area_type.substr(pos, 2)) {
+          case "01":
+            title += "~60";
+            break;
+          case "02":
+            title += "60~85";
+            break;
+          case "03":
+            title += "85~135";
+            break;
+          case "04":
+            title += "135~";
+            break;
+        }
+        pos += 2;
+      } while (area_type.length > pos);
+
     }
     title += ")";
+  }
+
+  if (overlay_chart && existChartData(title)) {
+    alert("이미 있는 차트입니다.");
+    return;
   }
 
   $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
@@ -120,5 +271,17 @@ function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, t
 }
 
 </script>
+
+{% include 'style.html' %}
+{% include 'container.html' %}
+<div style='width:100%; margin:20px;'>
+    <canvas id="myChart"></canvas>
+</div>
+<div id="aptSaleDiv" style="display:none;">
+<table id="aptSaleTable" class=custom-context-menu>
+<tr><th>날짜</th><th>전용면적(m<sup>2</sup>)</th><th>층</th><th>금액(만원)</th></tr>
+</table>
+</div>
+
 {% include 'bottom.html' %}
 

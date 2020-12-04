@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, json, jsonify
 from sqlalchemy import create_engine, text
 from json import JSONEncoder
 from datetime import date
+import datetime
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
@@ -10,7 +11,18 @@ app.engine = create_engine(app.config['DB_URL'], encoding = 'utf-8')
 
 @app.route("/")
 def index():
-    return render_template('index.html')
+  now = datetime.datetime.now()
+  sql = "insert into access_log values('"
+  sql += request.remote_addr + "', "
+  sql += "str_to_date('" + now.strftime('%Y%m%d%H%M%S') + "', '%Y%m%d%H%i%S'))"
+  try:
+    with app.engine.connect() as conn:
+        conn.execute(text(sql))
+        conn.commit()
+  except Exception as e:
+    print(str(e))
+
+  return render_template('index.html')
     
 def spreadDataForYM(rows, ym_label, data_label, data, labels):
     min_ym = ''
@@ -138,7 +150,7 @@ def getApt():
     region = params['region']
     dong = params['dong']
 
-    sql = "select id, apt_name"
+    sql = "select id, apt_name, k_apt_id"
     sql += "  from apt_master"
     sql += " where dong_region1_cd = '" + region + "'"
     sql += "   and dong_region2_cd = '" + dong + "'"
@@ -148,7 +160,7 @@ def getApt():
 
     data = []
     for r in result:
-        data.append([r['id'], r['apt_name']])
+        data.append([ r['id'], r['apt_name'], r['k_apt_id'] ])
     
     json_return=json.dumps(data)   #string #json
  
@@ -176,7 +188,14 @@ def getSaleStat():
     if dong != "":
         sql += " and dong = '" + dong + "'"
     if area_type != "":
-        sql += " and area_type = '" + area_type + "'"
+        sql += " and ("
+        pos = 0
+        while (len(area_type) > pos):
+          if (pos > 0):
+              sql += " or "
+          sql += " area_type = '" + area_type[pos:pos+2] + "'"
+          pos = pos + 2
+        sql += ")"
     if ages != "" and age_sign != "":
         sql += " and " + str(date.today().year - int(ages)) + age_sign + " made_year"
     sql += " ) a  group by ym"
@@ -194,4 +213,26 @@ def getSaleStat():
  
     return jsonify(json_return)
 
+
+@app.route("/getAptSale")
+def getAptSale():
+    params = request.args.to_dict()
+    apt = params['apt']
+    ym = params['ym']
+    sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale"
+    sql += " where apt_id = " + apt + " and ym = '" + ym + "'"
+    sql += " order by saled"
+    print(sql)
+    with app.engine.connect() as connection:
+        result = connection.execute(text(sql))
+
+    rows=result.fetchall()            
+
+    data = []
+    for r in rows:
+        data.append([ r['dt'], r['area'], r['floor'], r['price'] ])
+
+    json_return=json.dumps(data)   #string #json
+ 
+    return jsonify(json_return)
 
