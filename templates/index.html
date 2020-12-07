@@ -2,6 +2,8 @@
 <script>
 var myChart = null;
 var overlay_chart = false;
+var relative_chart = false;
+var gChartData = new Map();
 
 var defaultDataset = [{
                 fillColor : "rbga(151,187,205,0.2)",
@@ -62,8 +64,8 @@ function createChart(title, labels) {
       var clickedDatasetIndex = activePoint[0]._datasetIndex;
       var clickedElementindex = activePoint[0]._index;
       var label = myChart.data.labels[clickedElementindex];
-      if (myChart.data.datasets[clickedDatasetIndex].key != null) {
-        apt = myChart.data.datasets[clickedDatasetIndex].key;
+      if (myChart.data.datasets[clickedDatasetIndex].apt != null) {
+        apt = myChart.data.datasets[clickedDatasetIndex].apt;
         $.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt+"&ym="+label, function(jsonData){
           data = JSON.parse(jsonData);
           showAptSaleTable(evt, data);
@@ -139,15 +141,7 @@ function rpadLabels(maxYm, labels) {
   }
 }
 
-function drawChart(title, labels, data, key){
-  if (!overlay_chart) {
-    clearChart();
-  }
-  if (myChart == null) {
-    createChart(title, labels);
-  }
-
-  if (myChart['data']['datasets'].length > 0) {
+function spreadLabels(labels, data) {
     var chartLabels = myChart['data']['labels'];
     if (chartLabels[0] < labels[0]) {
       lpadData(chartLabels[0], labels[0], data);
@@ -167,6 +161,116 @@ function drawChart(title, labels, data, key){
       }
       rpadLabels(labels[labels.length-1], chartLabels);
     }
+}
+
+function updateAbs2Rel(data) {
+
+	// 모든 차트의 값이 0이 아닌 첫번째 X좌표를 찾는다
+	for(var i = 0; i < myChart.data.labels.length; i++) {
+		if (data[i] == null) continue;
+		var bZero = false;
+		for(var j = 0; j < myChart.data.datasets.length; j++) {
+			if (myChart.data.datasets[j].data[i] == null) {
+				bZero = true;
+				break;
+			}
+		}
+		if (!bZero) {
+			break;
+		}
+	}
+	var base_pos = i;
+	// 그 좌표의 첫번째 차트의 값을 기준치(100)로 삼는다
+
+	// 다른 데이터를 기준치에 대한 상대치로 변환한다
+	for(var j = 0; j < myChart.data.datasets.length; j++) {
+		myChart.data.datasets[j].relative = relative_chart;
+		var base = myChart.data.datasets[j].data[base_pos];
+		for(i = 0; i < myChart.data.labels.length; i++) {
+			var v = myChart.data.datasets[j].data[i]; 
+                	myChart.data.datasets[j].data[i] = (v / base) * 100;
+		}
+	}
+
+	return base_pos;
+
+}
+
+function restoreAbsData() {
+	for(var i = 0; i < myChart.data.datasets.length; i++) {
+		originChart = gChartData.get(myChart.data.datasets[i].label);
+		originLabels = Object.values(originChart.labels);
+		originData = Object.values(originChart.data);
+		myChart.data.datasets[i].relative = relative_chart;
+		for(var j = 0; j < originLabels.length; j++) {
+			var k = 0;
+			for(; k < myChart.data.labels.length; k++) {
+				if (originLabels[j] == myChart.data.labels[k]) {
+					myChart.data.datasets[i].data[k] = originData[j];
+					break;
+				}
+			}
+		}
+	}
+}
+
+function updateChartBase(data) {
+
+	if (myChart == null || myChart.data.datasets.length < (data == null ? 2 : 1))
+		return;
+
+	var base_pos = -1;
+	// 기존 차트와 현재의 절대치/상대치 기준이 다르다면
+	if (myChart['data']['datasets'][0].relative != relative_chart) {
+		if (relative_chart) {
+			if (data == null)
+				data = myChart.data.datasets[0].data;
+			// 절대치를 상대치로 변환하거나
+			base_pos = updateAbs2Rel(data);
+		} else {
+			// 보관해둔 절대치 데이터를 복원한다
+			restoreAbsData();
+		}
+		myChart.update();
+	}
+
+	return base_pos;
+
+}
+
+function drawChart(title, labels, data, relative, apt){
+  if (!overlay_chart) {
+    clearChart();
+  }
+  if (myChart == null) {
+    createChart(title, labels);
+  }
+
+  gChartData.set(title, {
+	labels : $.extend({}, labels),
+	data : $.extend({}, data),
+	apt : apt
+  });
+
+  var base_pos = -1;
+  // 기존에 그려진 차트가 있으면
+  if (myChart['data']['datasets'].length > 0) {
+	// 새 데이터와 기존 데이터의 X 라벨의 From~To를 맞춰준다
+  	spreadLabels(labels, data);
+	// 절대치/상대치 기준이 바뀌었다면 다시 그린다
+  	base_pos = updateChartBase(data);
+  }
+
+  // 새 데이터도 상대치로 변환...
+  if (relative_chart) {
+	  if (base_pos < 0) {
+		for (var i = 0; data[i] == null && i < data.length; i++) {
+		}
+		base_pos = i;
+	  }
+	for (var i = 0; i < data.length; i++) {
+		data[i] = (data[i] / data[base_pos]) * 100;
+	}
   }
 
   var dataset = {
@@ -176,7 +280,8 @@ function drawChart(title, labels, data, key){
         strokeColor: 'blue',
         data: data,
         spanGaps: true,
-        key : key
+	relative: relative_chart,
+        apt : apt
       };
 
   myChart['data']['datasets'].push(dataset);
@@ -184,22 +289,8 @@ function drawChart(title, labels, data, key){
 
 }
 
-function existChartData(title) {
-  var exists = false;
-
-  if (myChart != null) {
-    for(var d in myChart['data']['datasets']) {
-      if (myChart['data']['datasets'][d].label == title) {
-        exists = true; 
-        break;
-      }
-    }
-  }
-  return exists;
-}
-
 function drawSaleLineChart(apt, title) {
-  if (overlay_chart && existChartData(title)) {
+  if (overlay_chart && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
@@ -211,8 +302,9 @@ function drawSaleLineChart(apt, title) {
 
 }
 
-function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
-  params = "from_ym=" + from_ym;
+function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
+  params = "complex=" + complex;
+  params += "&from_ym=" + from_ym;
   params += "&to_ym=" + to_ym;
   params += "&ages=" + ages;
   params += "&age_sign=" + age_sign;
@@ -220,21 +312,21 @@ function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, t
   params += "&region=" + region;
   params += "&dong=" + dong;
 
-  if (from_ym + to_ym + ages + area_type != "") {
-    needsComma = false;
+  if (complex + from_ym + to_ym + ages + area_type != "") {
     title += " (";
+    if (complex == "Y"){
+      title += "등록된 단지만";
+    } else {
+      title += "모든 실거래";
+    }
     if (from_ym + to_ym != ""){
-      title += "기간 : " + from_ym + " ~ " + to_ym;
-      needsComma = true;
+      title += ", 기간 : " + from_ym + " ~ " + to_ym;
     }
     if (ages != ""){
-      if (needsComma) title += ", ";
-      title += "연식 : " + ages + " 년 " + (age_sign == '<' ? "이내" : "이상");
-      needsComma = true;
+      title += ", 연식 : " + ages + " 년 " + (age_sign == '<' ? "이내" : "이상");
     }
     if (area_type != ""){
-      if (needsComma) title += ", ";
-      title += "전용면적 : ";
+      title += ", 전용면적 : ";
       pos = 0;
       do {
         if (pos > 0) title += "|";
@@ -259,7 +351,7 @@ function drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, t
     title += ")";
   }
 
-  if (overlay_chart && existChartData(title)) {
+  if (overlay_chart && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }

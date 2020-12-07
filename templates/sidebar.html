@@ -8,6 +8,11 @@ function setOverlayChart(b) {
   overlay_chart = b;
 }
 
+function setRelativeChart(b) {
+  relative_chart = b;
+  updateChartBase(null);
+}
+
 function constructSel(sel, data) {
   sel.innerHTML = "";
   var option = document.createElement("option");
@@ -68,6 +73,7 @@ function refreshApt() {
 }
 
 function requestSaleStat() {
+  complex = $('input#complex').is(":checked") ? "Y" : "N";
   from_ym = $('input#from_ym').val();
   to_ym = $('input#to_ym').val();
   ages = $('select#ages').val();
@@ -90,7 +96,7 @@ function requestSaleStat() {
     dong = $('select#dong').val();
     title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
   }
-  drawSaleStat(from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
+  drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
 
 }
 
@@ -119,6 +125,7 @@ function toggleTerms() {
   <div class="my-box">
   <span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a>
   <div id=toggle_term style="display:none;">
+	  <input type=checkbox id=complex onclick="refreshApt();">등록된 단지만</input><br>
   <label>매매기간:</label><br><input id=from_ym maxlength=6 size=6 style="width:70px;"> ~ <input id=to_ym maxlength=6 size=6 style="width:70px;"><br>
   <label>연식:</label>
     <select id=ages>
@@ -157,14 +164,14 @@ function toggleTerms() {
   <br>
   <div class="my-box">
   <label><strong>동별 아파트 선택</strong></label>
-    <input type=checkbox id=complex onclick="refreshApt();">단지만</input>
   <select onchange="drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
   </select>
   </div>
   <br>
   <div class="my-box">
   <label><strong>차트 옵션</strong></label><br>
-  <input type=checkbox id=overlay_chart onclick="setOverlayChart(this.checked);">겹쳐 그리기</input>
+  <input type=checkbox id=overlay_chart onclick="setOverlayChart(this.checked);">겹쳐 그리기</input><br>
+  <input type=checkbox id=relatiev_chart onclick="setRelativeChart(this.checked);">상대수치로 그리기</input>
   </div>
   <br>
 </div>

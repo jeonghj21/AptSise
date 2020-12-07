@@ -5,7 +5,7 @@ from datetime import date
 import datetime
 
 app = Flask(__name__)
-app.config.from_pyfile('config.py')
+app.config.from_envvar('FLASK_CONFIG')
 
 app.engine = create_engine(app.config['DB_URL'], encoding = 'utf-8')
 
@@ -18,7 +18,6 @@ def index():
   try:
     with app.engine.connect() as conn:
         conn.execute(text(sql))
-        conn.commit()
   except Exception as e:
     print(str(e))
 
@@ -136,7 +135,6 @@ def getDong():
             dongs_in_r.append([res['dong_cd'], res['dong_name']])
         dongs[r[0]] = dongs_in_r
 
-    print(len(regions))
     data.append(dongs)
     
     json_return=json.dumps(data)   #string #json
@@ -155,6 +153,7 @@ def getApt():
     sql += " where dong_region1_cd = '" + region + "'"
     sql += "   and dong_region2_cd = '" + dong + "'"
     sql += " order by apt_name"
+    print(sql)
     with app.engine.connect() as connection:
         result = connection.execute(text(sql))
 
@@ -169,6 +168,7 @@ def getApt():
 @app.route("/getSaleStat")
 def getSaleStat():
     params = request.args.to_dict()
+    complex_only = params['complex']
     from_ym = params['from_ym']
     to_ym = params['to_ym']
     region = params['region']
@@ -179,6 +179,8 @@ def getSaleStat():
 
     sql = " select ym, cast(round(avg(unit_price), 0) as signed) unit_price, sum(cnt) cnt from("
     sql += " select * from apt_sale_stats where 1 = 1"
+    if complex_only != "":
+        sql += " and complex_flag = '" + complex_only + "'"
     if from_ym != "":
         sql += " and ym >= '" + from_ym + "'"
     if to_ym != "":
