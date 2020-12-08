@@ -1,0 +1,33 @@
+<style>
+table.ui-datepicker-calendar { display:none; }
+.my-box { border:1px solid; padding:10px; }
+.sidebar{height:100%;width:200px;background-color:#fff;position:fixed!important;z-index:1;overflow:auto}
+.floating-list {
+	display: none;
+	z-index: 999;
+        position: absolute;
+        background-color: #ffffff;
+	width: 550px;
+	overflow: auto;
+      }
+table.aptSaleList {
+      width: 100%;
+      border-top: 1px solid #444444;
+      border-collapse: collapse;
+    }
+.aptSaleListItem {
+      border-bottom: 1px solid #444444;
+    padding: 10px;
+      text-align: center;
+  }
+.aptSaleListHeader {
+      background-color: #0d47a1;
+      color: #ffffff;
+    }
+tbody tr:nth-child(2n) {
+   background-color: #bbdefb;
+      }
+tbody tr:nth-child(2n+1) {
+      background-color: #e3f2fd;
+      }
+</style>
