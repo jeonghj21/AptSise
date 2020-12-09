@@ -53,13 +53,21 @@ def spreadDataForYM(rows, ym_label, data_label, data, labels):
 def getSale():
     params = request.args.to_dict()
     apt = params['apt']
+    ma = (params['ma'].upper() == "TRUE")
 
-    sql = "select date_format(saled, '%Y%m') ym"
-    sql += ", round(sum(price)/(sum(area)/3.3),1) price"
-    sql += ", count(id) count"
-    sql += " from apt_sale s"
-    sql += " where apt_id=" + apt
-    sql += " group by date_format(saled, '%Y%m') order by date_format(saled, '%Y%m')"
+    sql = ""
+    if (ma):
+        sql = "select ym, unit_price price"
+        sql += " from apt_sale_ma s"
+        sql += " where apt_id=" + apt
+        sql += " order by ym"
+    else:
+        sql = "select date_format(saled, '%Y%m') ym"
+        sql += ", round(sum(price)/(sum(area)/3.3),1) price"
+        sql += ", count(id) count"
+        sql += " from apt_sale s"
+        sql += " where apt_id=" + apt
+        sql += " group by date_format(saled, '%Y%m') order by date_format(saled, '%Y%m')"
     print(sql)
     with app.engine.connect() as connection:
         result = connection.execute(text(sql))
@@ -68,22 +76,6 @@ def getSale():
     json_data = { 'labels': [], 'data':[], 'rawData':{} }
 
     spreadDataForYM(rows, 'ym', 'price', json_data['data'], json_data['labels'])
-
-    sql = "select date_format(saled, '%Y%m') ym, price, area, floor"
-    sql += " from apt_sale s"
-    sql += " where apt_id=" + apt
-    sql += " order by saled"
-    with app.engine.connect() as connection:
-        result = connection.execute(text(sql))
-
-    rows=result.fetchall()            
-    ym_raws = {}
-    ym_raw = []
-    for r in rows:
-        if ym_raws.__contains__(r['ym']):
-            ym_raw = ym_raws[r['ym']]
-        ym_raw.append({ 'area': r['area'], 'floor': r['floor'], 'price': r['price'] })
-        ym_raws[r['ym']] = ym_raw
 
     json_return=json.dumps(json_data)   #string #json
  
@@ -235,6 +227,36 @@ def getAptSale():
         data.append([ r['dt'], r['area'], r['floor'], r['price'] ])
 
     json_return=json.dumps(data)   #string #json
+ 
+    return jsonify(json_return)
+
+
+@app.route("/getKBIndex")
+def getKBIndex():
+    params = request.args.to_dict()
+    from_ym = params['from_ym']
+    to_ym = params['to_ym']
+    region = params['region']
+
+    sql = " select ym, index_val from kb_region_index_ym"
+    sql += " where region = '" + region + "'"
+    if from_ym != "":
+        sql += " and ym >= '" + from_ym + "'"
+    if to_ym != "":
+        sql += " and ym <= '" + to_ym + "'"
+
+    print(sql)
+    with app.engine.connect() as connection:
+        result = connection.execute(text(sql))
+
+    rows=result.fetchall()            
+    json_data = { 'labels': [], 'data':[] }
+
+    for r in rows:
+        json_data['labels'].append(r[0]);
+        json_data['data'].append(r[1]);
+
+    json_return=json.dumps(json_data)   #string #json
  
     return jsonify(json_return)
 

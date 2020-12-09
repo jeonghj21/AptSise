@@ -13,6 +13,10 @@ function setRelativeChart(b) {
   updateChartBase(null);
 }
 
+function setAptMA(b) {
+  gAptMA = b;
+}
+
 function constructSel(sel, data) {
   sel.innerHTML = "";
   var option = document.createElement("option");
@@ -100,14 +104,33 @@ function requestSaleStat() {
 
 }
 
+function requestKBIndex() {
+  from_ym = $('input#from_ym').val();
+  to_ym = $('input#to_ym').val();
+  
+  region = $('select#region').val();
+  title = "KB지수[" + $('select#region option:checked').text() + "]";
+
+  if (!gRelativeChart) {
+	  if (!confirm("KB 지수는 상대수치로만 조회 가능합니다. 상대수치 조회로 변경하시겠습니까?"))
+		  return ;
+	  $('#ckbox_kbindex').prop("checked", true).trigger("change");
+  }
+
+  drawKBIndex(from_ym, to_ym, region, title);
+}
+
 function set_button(sel) {
 
   if (sel.id == 'dong') return;
 
-  if (sel.value=='all') 
+  if (sel.value=='all') { 
     document.all.region_btn.disabled = true; 
-  else 
+    document.all.kbindex_btn.disabled = true; 
+  } else { 
     document.all.region_btn.disabled = false;
+    document.all.kbindex_btn.disabled = false;
+  }
 }
 
 function toggleTerms() {
@@ -125,7 +148,7 @@ function toggleTerms() {
   <div class="my-box">
   <span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a>
   <div id=toggle_term style="display:none;">
-	  <input type=checkbox id=complex onclick="refreshApt();">등록된 단지만</input><br>
+	  <input type=checkbox id=complex onchange="refreshApt();">등록된 단지만</input><br>
   <label>매매기간:</label><br><input id=from_ym maxlength=6 size=6 style="width:70px;"> ~ <input id=to_ym maxlength=6 size=6 style="width:70px;"><br>
   <label>연식:</label>
     <select id=ages>
@@ -159,19 +182,21 @@ function toggleTerms() {
   </select><br>
   <center>
   <button id='region_btn' onclick="requestSaleStat();" disabled>평균평단가 조회</button>
+  <button id='kbindex_btn' onclick="requestKBIndex();" disabled>KB 구별 아파트지수 조회</button>
   </center>
   </div>
   <br>
   <div class="my-box">
   <label><strong>동별 아파트 선택</strong></label>
-  <select onchange="drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
+  <select onchange="if (this.selectedIndex == 0) return false; drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
   </select>
+  <input type=checkbox onchange="setAptMA(this.checked);">6개월 이동평균으로 조회하기</input><br>
   </div>
   <br>
   <div class="my-box">
   <label><strong>차트 옵션</strong></label><br>
-  <input type=checkbox id=gOverlayChart onclick="setOverlayChart(this.checked);">겹쳐 그리기</input><br>
-  <input type=checkbox id=relatiev_chart onclick="setRelativeChart(this.checked);">상대수치로 그리기</input>
+  <input type=checkbox onchange="setOverlayChart(this.checked);">겹쳐 그리기</input><br>
+  <input id=ckbox_kbindex type=checkbox onchange="setRelativeChart(this.checked);">상대수치로 그리기</input>
   </div>
   <br>
 </div>

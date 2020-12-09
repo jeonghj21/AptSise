@@ -1,12 +1,13 @@
 <head>
 <link rel="stylesheet" type="text/css" href="static/style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 </head>
 <script>
 var myChart = null;
 var gOverlayChart = false;
 var gRelativeChart = false;
+var gAptMA = false;
 var gChartData = new Map();
 
 var defaultDataset = [{
@@ -243,8 +244,39 @@ function updateAbs2Rel(data) {
 
 }
 
-function restoreAbsData() {
-	for(var i = 0; i < myChart.data.datasets.length; i++) {
+function restoreAbsData(){
+	// KB지수 차트는 스케일이 너무 작으므로 일단 원데이터의 스케일을 다른 차트의 첫번째 데이터 기준으로 변환
+	var base = -1;
+
+	for(let key of gChartData.keys()) {
+		if (!key.startsWith("KB지수[")) {
+		       var chart = gChartData.get(key);
+		       var data = Object.values(chart.data);
+		       for(var i = 0; i < data.length; i++) {
+		       		if (data[i] != null) {
+					base = data[0]; 
+				       	break;
+		       		}
+		       }
+		}
+	}
+
+	if (base > 0) {
+		for(let key of gChartData.keys()) {
+			if (key.startsWith("KB지수[")) {
+			       var chart = gChartData.get(key);
+			       var data = Object.values(chart.data);
+				var ratio = base / data[0];
+			       for(var i = 0; i < data.length; i++) {
+       		         		data[i] = (data[i] * ratio).toFixed(1);
+				}
+		       		chart.data = data;
+		       		gChartData.set(key, chart);
+			}
+      		}
+       }
+
+	for(i = 0; i < myChart.data.datasets.length; i++) {
 		originChart = gChartData.get(myChart.data.datasets[i].label);
 		originLabels = Object.values(originChart.labels);
 		originData = Object.values(originChart.data);
@@ -346,8 +378,10 @@ function drawSaleLineChart(apt, title) {
     return;
   }
 
-  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
+  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt+"&ma="+gAptMA, function(jsonData){
     data = JSON.parse(jsonData);
+    if (gAptMA)
+	title += "[6개월 이동평균]";
     drawChart(title, data['labels'], data['data'], apt);
   });
 
@@ -413,6 +447,21 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
   });
 }
 
+function drawKBIndex(from_ym, to_ym, region, title) {
+  params = "from_ym=" + from_ym;
+  params += "&to_ym=" + to_ym;
+  params += "&region=" + region;
+
+  if (gOverlayChart && Array.from(gChartData.keys()).includes(title)) {
+    alert("이미 있는 차트입니다.");
+    return;
+  }
+
+  $.getJSON("{{ config['BASE_URL'] }}getKBIndex?" + params, function(jsonData){
+    data = JSON.parse(jsonData);
+    drawChart(title, data['labels'], data['data']);
+  });
+}
 </script>
 
 {% include 'container.html' %}
