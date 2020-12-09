@@ -211,3 +211,39 @@ create table access_log (ip varchar(20), dt datetime);
 
 create table tmp_dup_apt1 as select apt_name, region, road_name, road_bldg_pri, dong, k_apt_id, count(*) cnt from apt_master group by apt_name, region, road_name, road_bldg_pri, dong, dong_pri, dong_jibun, jibun, k_apt_id having count(*) > 1 ;
 
+create table sale_stat_change_rate (complex_flag char(1) not null, region char(5) not null, dong char(5) not null, made_year int not null, area_type ch
+ar(2) not null, ym char(6) not null, period int not null, unit_price int not null, prev_ym char(6) not null, prev_price int not null, change_rate decimal(10,2
+) not null, primary key(complex_flag, region, dong, made_year, area_type, ym, period));
+
+insert into sale_stat_change_rate select a.complex_flag, a.region, a.dong, a.made_year, a.area_type, a.ym, 12, a.unit_price, b.ym, b.unit_price, (a.uni
+t_price/b.unit_price)*100 from apt_sale_stats a, apt_sale_stats b where b.region=a.region and b.dong=a.dong and b.made_year = a.made_year and b.area_type = a.
+area_type and b.complex_flag = a.complex_flag and b.ym = concat(cast(substr(a.ym,1,4)-1 as char(4)), substr(a.ym,5,2));
+
+create table ref_region (region_cd char(5) not null primary key, region_name varchar(10) not null);
+
+insert into ref_region values('강북구', '11305');
+insert into ref_region values('광진구', '11215');
+insert into ref_region values('노원구', '11350');
+insert into ref_region values('도봉구', '11320');
+insert into ref_region values('동대문구', '11230');
+insert into ref_region values('마포구', '11440');
+insert into ref_region values('서대문구', '11410');
+insert into ref_region values('성동구', '11200');
+insert into ref_region values('성북구', '11290');
+insert into ref_region values('용산구', '11170');
+insert into ref_region values('은평구', '11380');
+insert into ref_region values('종로구', '11110');
+insert into ref_region values('중구', '11140');
+insert into ref_region values('중랑구', '11260');
+insert into ref_region values('강남구', '11680');
+insert into ref_region values('강동구', '11740');
+insert into ref_region values('강서구', '11500');
+insert into ref_region values('관악구', '11620');
+insert into ref_region values('구로구', '11530');
+insert into ref_region values('금천구', '11545');
+insert into ref_region values('동작구', '11590');
+insert into ref_region values('서초구', '11650');
+insert into ref_region values('송파구', '11710');
+insert into ref_region values('양천구', '11470');
+insert into ref_region values('영등포구', '11560');
+

@@ -1,8 +1,12 @@
+<head>
+<link rel="stylesheet" type="text/css" href="static/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+</head>
 <script>
 var myChart = null;
-var overlay_chart = false;
-var relative_chart = false;
+var gOverlayChart = false;
+var gRelativeChart = false;
 var gChartData = new Map();
 
 var defaultDataset = [{
@@ -28,13 +32,51 @@ var defaultOptions = {
   }
 };
 
+function setPopupPosition(event, popup) { 
+
+	    var mousePosition = {}; 
+	    var popupPosition = {}; 
+	    var menuDimension = {}; 
+
+	    menuDimension.x = popup.outerWidth(); 
+	    menuDimension.y = popup.outerHeight(); 
+	    mousePosition.x = event.pageX; 
+	    mousePosition.y = event.pageY; 
+
+	    if (mousePosition.x + menuDimension.x > $(window).width() + $(window).scrollLeft()) { 
+	        popupPosition.x = mousePosition.x - menuDimension.x; 
+	    } else { 
+	    	popupPosition.x = mousePosition.x; 
+	    } 
+
+	    if (mousePosition.y + menuDimension.y > $(window).height() + $(window).scrollTop()) { 
+	         popupPosition.y = mousePosition.y - menuDimension.y; 
+	    } else { 
+	    	popupPosition.y = mousePosition.y; 
+	    } 
+
+	    return popupPosition; 
+} 
+
 function showAptSaleTable(event, data) {
-  $("#aptSaleDiv").show();
-  $("#aptSaleDiv").css({top: event.pageY+'px', left: event.pageX+'px'});
-  $('#aptSaleTable > tbody:last').find("tr:gt(0)").remove();
+  $('#aptSaleTable > tbody:last').empty();
   $.each(data, function(idx, r) {
-    $('#aptSaleTable > tbody:last').append('<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td></tr>');
+	  var area = parseFloat(r[1]);
+	  var price = parseInt(r[3].replace(/,/g,""));
+	  var unit_price = (price / (area/3.3)).toFixed(1);
+	  unit_price = unit_price.toString().replace(/(\d)(?=(?:\d{3})+(?!\d))/g, "$1,");
+	  var html = '<tr class=aptSaleListLine>';
+	  html += "<td class=aptSaleListItem style='text-align: center;'>" + r[0] + '</td>';
+	  html += "<td class=aptSaleListItem style='text-align: right;'>" + r[1] + ' (' + (area/3.3).toFixed(1) + '평)</td>';
+	  html += "<td class=aptSaleListItem style='text-align: center;'>" + r[2] + '</td>';
+	  html += "<td class=aptSaleListItem style='text-align: right;'>" + r[3] + '</td>';
+	  html += "<td class=aptSaleListItem style='text-align: right;'>" + unit_price + '</td>';
+	  html += "</tr>";
+	  $('#aptSaleTable > tbody:last').append(html);
   });
+  var div = $("#aptSaleDiv");
+  var pos = setPopupPosition(event, div);
+  div.css({top: pos.y+'px', left: pos.x+'px', display: 'block'});
 }
 
 function createChart(title, labels) {
@@ -70,8 +112,10 @@ function createChart(title, labels) {
           data = JSON.parse(jsonData);
           showAptSaleTable(evt, data);
         });
+	return;
       }
     }
+    $("#aptSaleDiv").hide();
   };
 
 }
@@ -81,6 +125,8 @@ function clearChart() {
     myChart.destroy();
     myChart = null;
   }
+  gChartData.clear();
+
 }
 
 function getMonths(ym1, ym2) {
@@ -184,11 +230,12 @@ function updateAbs2Rel(data) {
 
 	// 다른 데이터를 기준치에 대한 상대치로 변환한다
 	for(var j = 0; j < myChart.data.datasets.length; j++) {
-		myChart.data.datasets[j].relative = relative_chart;
+		myChart.data.datasets[j].relative = gRelativeChart;
 		var base = myChart.data.datasets[j].data[base_pos];
 		for(i = 0; i < myChart.data.labels.length; i++) {
 			var v = myChart.data.datasets[j].data[i]; 
-                	myChart.data.datasets[j].data[i] = (v / base) * 100;
+			if (v != null)
+                		myChart.data.datasets[j].data[i] = ((v / base) * 100).toFixed(1);
 		}
 	}
 
@@ -201,7 +248,7 @@ function restoreAbsData() {
 		originChart = gChartData.get(myChart.data.datasets[i].label);
 		originLabels = Object.values(originChart.labels);
 		originData = Object.values(originChart.data);
-		myChart.data.datasets[i].relative = relative_chart;
+		myChart.data.datasets[i].relative = gRelativeChart;
 		for(var j = 0; j < originLabels.length; j++) {
 			var k = 0;
 			for(; k < myChart.data.labels.length; k++) {
@@ -216,13 +263,13 @@ function restoreAbsData() {
 
 function updateChartBase(data) {
 
-	if (myChart == null || myChart.data.datasets.length < (data == null ? 2 : 1))
+	if (myChart == null || myChart.data.datasets.length == 0)
 		return;
 
 	var base_pos = -1;
 	// 기존 차트와 현재의 절대치/상대치 기준이 다르다면
-	if (myChart['data']['datasets'][0].relative != relative_chart) {
-		if (relative_chart) {
+	if (myChart['data']['datasets'][0].relative != gRelativeChart) {
+		if (gRelativeChart) {
 			if (data == null)
 				data = myChart.data.datasets[0].data;
 			// 절대치를 상대치로 변환하거나
@@ -230,7 +277,8 @@ function updateChartBase(data) {
 		} else {
 			// 보관해둔 절대치 데이터를 복원한다
 			restoreAbsData();
-		}
+	 	}
+  		$("#aptSaleDiv").hide();
 		myChart.update();
 	}
 
@@ -238,8 +286,9 @@ function updateChartBase(data) {
 
 }
 
-function drawChart(title, labels, data, relative, apt){
-  if (!overlay_chart) {
+function drawChart(title, labels, data, apt){
+  $("#aptSaleDiv").hide();
+  if (!gOverlayChart) {
     clearChart();
   }
   if (myChart == null) {
@@ -262,14 +311,16 @@ function drawChart(title, labels, data, relative, apt){
   }
 
   // 새 데이터도 상대치로 변환...
-  if (relative_chart) {
+  if (gRelativeChart) {
 	  if (base_pos < 0) {
-		for (var i = 0; data[i] == null && i < data.length; i++) {
+		while (data[base_pos] == null && base_pos < data.length) {
+			base_pos++;
 		}
-		base_pos = i;
 	  }
+	var base = data[base_pos];
 	for (var i = 0; i < data.length; i++) {
-		data[i] = (data[i] / data[base_pos]) * 100;
+		if (data[i] != null) 
+			data[i] = ((data[i] / base) * 100).toFixed(1);
 	}
   }
 
@@ -280,7 +331,7 @@ function drawChart(title, labels, data, relative, apt){
         strokeColor: 'blue',
         data: data,
         spanGaps: true,
-	relative: relative_chart,
+	relative: gRelativeChart,
         apt : apt
       };
 
@@ -290,7 +341,7 @@ function drawChart(title, labels, data, relative, apt){
 }
 
 function drawSaleLineChart(apt, title) {
-  if (overlay_chart && Array.from(gChartData.keys()).includes(title)) {
+  if (gOverlayChart && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
@@ -351,7 +402,7 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
     title += ")";
   }
 
-  if (overlay_chart && Array.from(gChartData.keys()).includes(title)) {
+  if (gOverlayChart && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
@@ -364,14 +415,22 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
 
 </script>
 
-{% include 'style.html' %}
 {% include 'container.html' %}
 <div style='width:100%; margin:20px;'>
     <canvas id="myChart"></canvas>
 </div>
-<div id="aptSaleDiv" style="display:none;">
-<table id="aptSaleTable" class=custom-context-menu>
-<tr><th>날짜</th><th>전용면적(m<sup>2</sup>)</th><th>층</th><th>금액(만원)</th></tr>
+<div id="aptSaleDiv" class="floating-list">
+<table id="aptSaleTable">
+<thead>
+<tr class="aptSaleListHeader" >
+	<th class="aptSaleListItem" style="width:100px;">날짜</th>
+	<th class="aptSaleListItem" style="width:150px;">전용면적(m<sup>2</sup>)</th>
+	<th class="aptSaleListItem" style="width:30px;">층</th>
+	<th class="aptSaleListItem" style="width:120px;">총금액(만원)</th>
+	<th class="aptSaleListItem" style="width:120px;">평단가(만원)</th>
+</tr>
+</thead>
+<tbody></tbody>
 </table>
 </div>
 

@@ -5,11 +5,11 @@ var dongs = {};
 var apts = {};
 
 function setOverlayChart(b) {
-  overlay_chart = b;
+  gOverlayChart = b;
 }
 
 function setRelativeChart(b) {
-  relative_chart = b;
+  gRelativeChart = b;
   updateChartBase(null);
 }
 
@@ -170,7 +170,7 @@ function toggleTerms() {
   <br>
   <div class="my-box">
   <label><strong>차트 옵션</strong></label><br>
-  <input type=checkbox id=overlay_chart onclick="setOverlayChart(this.checked);">겹쳐 그리기</input><br>
+  <input type=checkbox id=gOverlayChart onclick="setOverlayChart(this.checked);">겹쳐 그리기</input><br>
   <input type=checkbox id=relatiev_chart onclick="setRelativeChart(this.checked);">상대수치로 그리기</input>
   </div>
   <br>
