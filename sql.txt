@@ -247,3 +247,33 @@ insert into ref_region values('송파구', '11710');
 insert into ref_region values('양천구', '11470');
 insert into ref_region values('영등포구', '11560');
 
+create table kb_region_index_ym (region char(5) not null, ym char(6) not null, index_val double(5,2), primary key(region, ym));
+load DATA INFILE '/tmp/mysql/kb-apt-index.csv' INTO TABLE kb_region_index_ym FIELDS TERMINATED BY ','  LINES TERMINATED BY '\n';
+
+create table apt_sale_ma (apt_id int not null, ym char(6) not null, ma int not null, unit_price double(10,2), primary key(apt_id, ym, ma));
+
+insert into apt_sale_ma select apt_id, a.ym, 6, avg(price/(area/3.3)) from tmp_ym a, apt_sale b where b.saled between date_sub(date_add(str_to_date(con
+cat(a.ym, '01000000'), '%Y%m%d%H%i%S'), interval 1 month), interval 6 month) and date_sub(date_add(str_to_date(concat(a.ym, '01235959'), '%Y%m%d%H%i%S'), inte
+rval 1 month), interval 1 day) group by apt_id, ym;
+
+
+create table apt_master_new (id int not null auto_increment, apt_name varchar(255) not null, region char(5) not null, dong char(5) not null, road_cd va
+rchar(7), made_year int not null, primary key (id));
+
+insert into apt_master_new select NULL, apt_name, dong_region1_cd, dong_region2_cd, road_cd, made_year from aptsise.aptsise group by apt_name, dong_reg
+ion1_cd, dong_region2_cd, road_cd, made_year;
+
+update aptsise.aptsise a, apt_master b set a.apt_id = b.id
+ where a.apt_name = b.apt_name 
+    and a.dong_region1_cd = b.region 
+    and a.road_cd = b.road_cd 
+    and a.dong_region2_cd = b.dong 
+    and a.made_year = b.made_year;
+
+create table tmp_apt_dup as select b.id new_id, a.* from apt_master a, apt_master_new b, tmp_apt_mapping c where c.apt_id = a.id and a.apt_name=b.apt_n
+ame and a.region = b.region and a.dong_region2_cd = b.dong;
+
+alter table tmp_apt_mapping add new_id int;
+update tmp_apt_mapping a set new_id = (select new_id from tmp_apt_dup where id in (select id from tmp_apt_dup group by id having count(*) = 1) and id=a
+.apt_id);
+
