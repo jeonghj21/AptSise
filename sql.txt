@@ -277,3 +277,60 @@ alter table tmp_apt_mapping add new_id int;
 update tmp_apt_mapping a set new_id = (select new_id from tmp_apt_dup where id in (select id from tmp_apt_dup group by id having count(*) = 1) and id=a
 .apt_id);
 
+sql 화일 백그라운드 실행
+nohup mysql -u jhj -p1111 prj < update_apt_id.sql  1>/dev/null 2>&1 &
+
+create table raw_data (거래금액 varchar(100),건축년도 int,년 int,도로명 varchar(100),도로명건물본번호코드 varchar(100),도로명건물부번호코드 varchar(100),도로명시군구코드 varchar(100),도로명일련번호코드 varchar(100),도로명지상지하코드 varchar(100),도로명코드 varchar(100),법정동 varchar(100),법정동본번코드 varchar(100),법정동부번코드 varchar(100),법정동시군구코드 varchar(100),법정동읍면동코드 varchar(100),법정동지번코드 varchar(100),아파트 varchar(100),월 int,일 int,일련번호 varchar(100),전용면적 varchar(100),지번 varchar(100),지역코드 varchar(100),층 varchar(100),date varchar(100));
+
+LOAD DATA INFILE '/home/jeonghj21/aptsise/data/202012_202010-20201213051618.csv' INTO TABLE raw_data FIELDS TERMINATED BY ',' optionally enclosed by '"' LINES TERMINATED BY '\n' IGNORE 1 ROWS
+;
+
+select 건축년도,도로명코드,법정동시군구코드,법정동읍면동코드,아파트 from raw_data where (건축년도,도로명코드,법정동시군구코드,법정동읍면동코드,아파트) not in (select made_year, road_cd, region, dong, apt_name from apt_master_new) group by 건축년도, 도로명코드,법정동시군구코드,법정동읍면동코드,아파트;
+
+create table ref_road as select road_cd, road_name from aptsise.aptsise where road_cd is not null group by road_cd, road_name;
+
+update tmp_seoul_apt a set gu=(select region_cd from ref_region where region_name=a.gu);
+
+update tmp_seoul_apt a set dong=(select dong_cd from apt_dong where dong_name=a.dong and region_cd = a.gu);
+
+
+create table tmp_apt_id_mapping as select a.id, a.region, b.id apt_id from aptsise.aptsise a, apt_master_new b   where a.apt_name = b.apt_name      and a.dong_region1_cd = b.region      a
+nd a.road_cd = b.road_cd      and a.dong_region2_cd = b.dong      and a.made_year = b.made_year ;
+
+update aptsise.aptsise a set apt_id = (select apt_id from tmp_apt_id_mapping where id = a.id and region=a.region);
+
+
+create table raw_data (거래금액 varchar(20),건축년도 int,년 int,도로명 varchar(40),도로명건물본번호코드 varchar(20),도로명건물부번호코드 varchar(20),도로명시군구코드 varchar(20),도로명일
+련번호코드 varchar(20),도로명지상지하코드 varchar(20),도로명코드 varchar(20),법정동 varchar(20),법정동본번코드 varchar(20),법정동부번코드 varchar(20),법정동시군구코드 varchar(20),법정동읍면동코
+드 varchar(20),법정동지번코드 varchar(20),아파트 varchar(100),월 int,일 int,일련번호 varchar(20),전용면적 varchar(20),지번 varchar(20),지역코드 varchar(20),층 varchar(20),job_key varchar(20) );
+
+
+create table tmp_raw_data as select * from raw_data;
+insert into tmp_raw_data2 select * from tmp_raw_data where (아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번) not in (select 아파트,건
+축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번 from raw_data) and job_key = '';
+create index raw_data_ind1 on raw_data(아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번);
+create index tmp_raw_data_ind1 on tmp_raw_data(job_key, 아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번);
+alter table raw_data apt_id int;
+alter table tmp_raw_data apt_id int;
+
+insert into apt_master_new select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도 from tmp_raw_data2 where (건축년도,도로명코드,법정동시군구코드,법정동읍면동코드,아파트) not in (select made_year, road_cd, region, dong, apt_name from apt_master_new) group by 건축년도, 도로명코드,법정동시군구코드,법정동읍면동코드,아파트;
+
+
+update tmp_raw_data2 a set apt_id = (select id from apt_master_new where made_year = a.건축년도 and road_cd=a.도로명코드 and region=a.법정동시군구코드 and dong=a.법정동읍면동코드 and apt_name=a.아파트) where job_key = '' and apt_id is null;
+
+LOAD DATA INFILE \'/home/jeonghj21/aptsise/200601_20201213123322.csv\' INTO TABLE tmp_raw_data FIELDS TERMINATED BY \',\' optionally enclosed by \'"\' LINES TERMINATED BY \'\\n\' IGNORE 1 ROWS 
+(거래금액,건축년도,년,도로명,도로명건물본번호코드,도로명건물부번호코드,도로명시군구코드,도로명일련번호코드,도로명지상지하코드,도로명코드,법정동,법정동본번코드,법정동부번코드,법정동시군구코드,법 
+정동읍면동코드,법정동지번코드,아파트,월,일,일련번호,전용면적,지번, 지역코드, 층, job_key, @vapt_id) set apt_id = nullif(@vapt_id, \'\')
+
+
+select * from (select a.ym, a.cnt a_cnt, b.cnt b_cnt from (select ym, count(*) cnt from apt_sale group by ym) a left outer join (select ym, count(*) cnt from apt_sale_new  group by ym) b on a.ym = b.ym) a where a_cnt <> ifnull(b_cnt,0) order by ym;
+
+select job_key, job_param, TIMESTAMPDIFF(SECOND, start_dt, end_dt), get_cnt, insert_cnt, delete_cnt, new_apt_cnt from job_log where result = 'Y' order by job_key, job_param;
+
+select a.*, b.ma, b.ma_cnt from (select * from apt_sale_stats_new where ym='202012') a, (select region, dong, made_year, area_type, cast(sum(unit_price*cnt)/sum(cnt) as unsigned) ma, sum(cnt) ma_cnt from apt_sale_stats_new b where ym between '202007' and '202012' group by region, dong, made_year, area_type) b where b.region=a.region and b.dong=a.dong and b.area_type=a.area_type and b.made_year=a.made_year order by a.region,a.dong,a.made_year,a.area_type;
+
+
+update apt_sale_stats_new a set unit_price_6ma = (select ma from (select region, dong, made_year, area_type, cast(sum(unit_price*cnt)/sum(cnt) as unsigned) ma from apt_sale_stats_new b where ym between date_format(date_sub(str_to_date(concat(a.ym,'01'), '%Y%m%d'), interval 5 month), '%Y%m') and a.ym group by region, dong, made_year, area_type) b where b.region=a.region and b.dong=a.dong and b.area_type=a.area_type and b.made_year=a.made_year);
+
+select a.ym, a.unit_price, b.unit_price ma from (select apt_id, ym, round(avg(price/(area/3.3)), 2) unit_price from apt_sale_new where apt_id = 1 group by ym) a,  apt_sale_ma_new b where b.apt_id =a.apt_id and a.ym = b.ym and b.ma=6 order by a.ym
+

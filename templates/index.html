@@ -5,33 +5,7 @@
 </head>
 <script>
 var myChart = null;
-var gOverlayChart = false;
-var gRelativeChart = false;
-var gAptMA = false;
 var gChartData = new Map();
-
-var defaultDataset = [{
-                fillColor : "rbga(151,187,205,0.2)",
-                strokeColor : "rbga(151,187,205,1)",
-                pointColor : "rbga(151,187,205,1)",
-                pointStrokeColor : "#fff",
-                pointHighlightFill : "#fff",
-                pointHighlightStroke : "rbga(151,187,205,1)"
-            }];
-
-var defaultOptions = {
-  scales: {
-    yAxes: [{
-      id: 'A',
-      type: 'linear',
-      position: 'left',
-    }, {
-      id: 'B',
-      type: 'linear',
-      position: 'right',
-    }]
-  }
-};
 
 function setPopupPosition(event, popup) { 
 
@@ -80,44 +54,64 @@ function showAptSaleTable(event, data) {
   div.css({top: pos.y+'px', left: pos.x+'px', display: 'block'});
 }
 
+function addRightYAxe() {
+	if (myChart == null) return;
+
+	myChart['options']['scales']['yAxes'].push({
+		id: 'B',
+		type: 'linear',
+		position: 'right',
+		ticks: {
+			min: 0
+		}
+	});
+
+}
+
+function removeRightYAxe() {
+	if (myChart == null) return;
+
+	myChart['options']['scales']['yAxes'].pop();
+}
+
 function createChart(title, labels) {
-  var ctx = document.getElementById("myChart").getContext("2d");
-  myChart = new Chart (ctx, {
-    type: 'line',
-    data: {
-      labels : labels,
-      datasets : []
-    },
-    options : {
-      scales: {
-        yAxes: [{
-          id: 'A',
-          type: 'linear',
-          position: 'left'
-        }]
-      }
-    }
-  });
+	var ctx = document.getElementById("myChart").getContext("2d");
+	myChart = new Chart (ctx, {
+		type: 'line',
+		data: {
+			labels : labels,
+			datasets : []
+		},
+		options : {
+			scales: {
+				yAxes: [{
+					id: 'A',
+					type: 'linear',
+					position: 'left'
+				}]
+			}
+		}
+	});
 
-  document.getElementById("myChart").onclick = function(evt) {
-    var activePoint = myChart.getElementAtEvent(event);
+	document.getElementById("myChart").onclick = function(evt) {
+		var activePoint = myChart.getElementAtEvent(event);
 
-    // make sure click was on an actual point
-    if (activePoint.length > 0) {
-      var clickedDatasetIndex = activePoint[0]._datasetIndex;
-      var clickedElementindex = activePoint[0]._index;
-      var label = myChart.data.labels[clickedElementindex];
-      if (myChart.data.datasets[clickedDatasetIndex].apt != null) {
-        apt = myChart.data.datasets[clickedDatasetIndex].apt;
-        $.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt+"&ym="+label, function(jsonData){
-          data = JSON.parse(jsonData);
-          showAptSaleTable(evt, data);
-        });
-	return;
-      }
-    }
-    $("#aptSaleDiv").hide();
-  };
+		// make sure click was on an actual point
+		if (activePoint.length > 0) {
+			var clickedDatasetIndex = activePoint[0]._datasetIndex;
+			var key = myChart.data.datasets[clickedDatasetIndex].label;
+			var chart = gChartData.get(key);
+			if (chart != null && chart.apt != null) {
+				var label = myChart.data.labels[activePoint[0]._index];
+				$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+chart.apt+"&ym="+label, function(jsonData){
+					data = JSON.parse(jsonData);
+					showAptSaleTable(evt, data);
+				});
+				return;
+			}
+		}
+		$("#aptSaleDiv").hide();
+	};
 
 }
 
@@ -145,20 +139,24 @@ function getMonths(ym1, ym2) {
 
 }
 
-function lpadData(ym1, ym2, data) {
+function lpadData(ym1, ym2, data, volume_data) {
 
   var months = getMonths(ym1, ym2);
   for(var i = 0; i < months; i++) {
     data.unshift(null);
+	if (volume_data)
+		volume_data.unshift(null);
   }
 
 }
 
-function rpadData(ym1, ym2, data) {
+function rpadData(ym1, ym2, data, volume_data) {
 
   var months = getMonths(ym1, ym2);
   for(var i = 0; i < months; i++) {
     data.push(null);
+	if (volume_data)
+		volume_data.unshift(null);
   }
 }
 
@@ -188,10 +186,10 @@ function rpadLabels(maxYm, labels) {
   }
 }
 
-function spreadLabels(labels, data) {
+function spreadLabels(labels, data, volume_data) {
     var chartLabels = myChart['data']['labels'];
     if (chartLabels[0] < labels[0]) {
-      lpadData(chartLabels[0], labels[0], data);
+      lpadData(chartLabels[0], labels[0], data, volume_data);
     } else if (chartLabels[0] > labels[0]) {
       var chartDatasets = myChart['data']['datasets'];
       for(var i = 0; i < chartDatasets.length; i++) {
@@ -200,7 +198,7 @@ function spreadLabels(labels, data) {
       lpadLabels(labels[0], chartLabels);
     }
     if (chartLabels[chartLabels.length-1] > labels[labels.length-1]) {
-      rpadData(chartLabels[chartLabels.length-1], labels[labels.length-1], data);
+      rpadData(chartLabels[chartLabels.length-1], labels[labels.length-1], data, volume_data);
     } else if (chartLabels[chartLabels.length-1] < labels[labels.length-1]) {
       var chartDatasets = myChart['data']['datasets'];
       for(var i = 0; i < chartDatasets.length; i++) {
@@ -210,41 +208,7 @@ function spreadLabels(labels, data) {
     }
 }
 
-function updateAbs2Rel(data) {
-
-	// 모든 차트의 값이 0이 아닌 첫번째 X좌표를 찾는다
-	for(var i = 0; i < myChart.data.labels.length; i++) {
-		if (data[i] == null) continue;
-		var bZero = false;
-		for(var j = 0; j < myChart.data.datasets.length; j++) {
-			if (myChart.data.datasets[j].data[i] == null) {
-				bZero = true;
-				break;
-			}
-		}
-		if (!bZero) {
-			break;
-		}
-	}
-	var base_pos = i;
-	// 그 좌표의 첫번째 차트의 값을 기준치(100)로 삼는다
-
-	// 다른 데이터를 기준치에 대한 상대치로 변환한다
-	for(var j = 0; j < myChart.data.datasets.length; j++) {
-		myChart.data.datasets[j].relative = gRelativeChart;
-		var base = myChart.data.datasets[j].data[base_pos];
-		for(i = 0; i < myChart.data.labels.length; i++) {
-			var v = myChart.data.datasets[j].data[i]; 
-			if (v != null)
-                		myChart.data.datasets[j].data[i] = ((v / base) * 100).toFixed(1);
-		}
-	}
-
-	return base_pos;
-
-}
-
-function restoreAbsData(){
+function adjustKBIndexScale() {
 	// KB지수 차트는 스케일이 너무 작으므로 일단 원데이터의 스케일을 다른 차트의 첫번째 데이터 기준으로 변환
 	var base = -1;
 
@@ -264,125 +228,141 @@ function restoreAbsData(){
 	if (base > 0) {
 		for(let key of gChartData.keys()) {
 			if (key.startsWith("KB지수[")) {
-			       var chart = gChartData.get(key);
-			       var data = Object.values(chart.data);
+				var chart = gChartData.get(key);
+		 		var data = Object.values(chart.data);
 				var ratio = base / data[0];
-			       for(var i = 0; i < data.length; i++) {
-       		         		data[i] = (data[i] * ratio).toFixed(1);
+			    for(var i = 0; i < data.length; i++) {
+       		   		data[i] = (data[i] * ratio).toFixed(1);
 				}
-		       		chart.data = data;
-		       		gChartData.set(key, chart);
+		       	chart.data = data;
+		       	gChartData.set(key, chart);
 			}
-      		}
-       }
-
-	for(i = 0; i < myChart.data.datasets.length; i++) {
-		originChart = gChartData.get(myChart.data.datasets[i].label);
-		originLabels = Object.values(originChart.labels);
-		originData = Object.values(originChart.data);
-		myChart.data.datasets[i].relative = gRelativeChart;
-		for(var j = 0; j < originLabels.length; j++) {
-			var k = 0;
-			for(; k < myChart.data.labels.length; k++) {
-				if (originLabels[j] == myChart.data.labels[k]) {
-					myChart.data.datasets[i].data[k] = originData[j];
-					break;
-				}
-			}
-		}
+      	}
 	}
 }
 
-function updateChartBase(data) {
+function updateChart() {
+	if (myChart == null) return;
 
-	if (myChart == null || myChart.data.datasets.length == 0)
-		return;
+	// 현재 그려져있는 차트 데이터를 지우고
+	while(myChart['data']['datasets'].length > 0)
+		myChart['data']['datasets'].pop();
 
-	var base_pos = -1;
-	// 기존 차트와 현재의 절대치/상대치 기준이 다르다면
-	if (myChart['data']['datasets'][0].relative != gRelativeChart) {
-		if (gRelativeChart) {
-			if (data == null)
-				data = myChart.data.datasets[0].data;
-			// 절대치를 상대치로 변환하거나
-			base_pos = updateAbs2Rel(data);
-		} else {
-			// 보관해둔 절대치 데이터를 복원한다
-			restoreAbsData();
-	 	}
-  		$("#aptSaleDiv").hide();
-		myChart.update();
+	if (draw_options['draw_volume'] && myChart['options']['scales']['yAxes'].length == 1)
+		addRightYAxe();
+
+	if (!draw_options['draw_volume'] && myChart['options']['scales']['yAxes'].length > 1)
+		removeRightYAxe();
+
+	// 보관하고 있는 원래의 데이터로 다시 차트를 그린다
+	for(let key of gChartData.keys()) {
+		var chart = gChartData.get(key);
+		var data = Object.values(chart.data);
+		var volume_data = (chart.volume_data == null ? null : Object.values(chart.volume_data));
+		var ma_data = (chart.ma_data == null ? null : Object.values(chart.ma_data));
+		drawChart(key, chart.labels, data, chart.apt, volume_data, ma_data);
 	}
-
-	return base_pos;
-
 }
 
-function drawChart(title, labels, data, apt){
-  $("#aptSaleDiv").hide();
-  if (!gOverlayChart) {
-    clearChart();
-  }
-  if (myChart == null) {
-    createChart(title, labels);
-  }
+function makeRelativeData(base_pos, data) {
 
-  gChartData.set(title, {
-	labels : $.extend({}, labels),
-	data : $.extend({}, data),
-	apt : apt
-  });
-
-  var base_pos = -1;
-  // 기존에 그려진 차트가 있으면
-  if (myChart['data']['datasets'].length > 0) {
-	// 새 데이터와 기존 데이터의 X 라벨의 From~To를 맞춰준다
-  	spreadLabels(labels, data);
-	// 절대치/상대치 기준이 바뀌었다면 다시 그린다
-  	base_pos = updateChartBase(data);
-  }
-
-  // 새 데이터도 상대치로 변환...
-  if (gRelativeChart) {
-	  if (base_pos < 0) {
-		while (data[base_pos] == null && base_pos < data.length) {
-			base_pos++;
-		}
-	  }
+	// 그 데이터를 기준(100)으로 다 상대 수치로 변환한다
 	var base = data[base_pos];
 	for (var i = 0; i < data.length; i++) {
 		if (data[i] != null) 
 			data[i] = ((data[i] / base) * 100).toFixed(1);
 	}
-  }
+}
 
-  var dataset = {
-        label: title,
-        yAxisID: 'A',
-        pointColor: 'blue',
-        strokeColor: 'blue',
-        data: data,
-        spanGaps: true,
-	relative: gRelativeChart,
-        apt : apt
-      };
+function makeChartDataset(chartType, title, yAxisID, data) {
 
-  myChart['data']['datasets'].push(dataset);
-  myChart.update();
+	var dataset = {
+		type: chartType,
+		label: title,
+		yAxisID: yAxisID,
+		pointColor: 'blue',
+		strokeColor: 'blue',
+		data: data,
+		spanGaps: true
+	};
+
+	myChart['data']['datasets'].push(dataset);
+}
+
+function drawChart(title, labels, data, apt, volume_data, ma_data){
+
+	// 상대수치로 그리기 라면
+	if (draw_options['draw_relative']) {
+		// null이 아닌 첫번째 데이터를 찾아서
+		var base_pos = -1;
+		while (data[base_pos] == null && base_pos < data.length) {
+			base_pos++;
+		}
+		makeRelativeData(base_pos, data);
+		if (draw_options['draw_ma'] && ma_data != null)
+			makeRelativeData(base_pos, ma_data);
+	}
+
+	makeChartDataset('line', title, 'A', data);
+
+	// 6개월 이동평균으로 그리기
+	if (draw_options['draw_ma'] && ma_data != null) {
+		makeChartDataset('line', title + "(6MA)", 'A', ma_data);
+	}
+
+	// 거래량 같이 그리기
+	if (draw_options['draw_volume'] && volume_data) {
+		makeChartDataset('bar', title + ":거래건수", 'B', volume_data);
+	}
+
+	myChart.update();
+
+}
+
+function drawNewChart(title, labels, data, apt, volume_data, ma_data){
+	// 팡업 화면을 숨긴다
+	$("#aptSaleDiv").hide();
+
+	// 겹쳐 그리기 옵션이 아니면 기존 차트를 지운다
+	if (!draw_options['draw_overlap']) {
+		clearChart();
+	}
+
+	// 차트가 없다면 생성한다
+	if (myChart == null) {
+		createChart(title, labels);
+	}
+
+	// 기존에 그려진 차트가 있으면
+	if (myChart['data']['datasets'].length > 0) {
+		// 새 데이터와 기존 데이터의 X 라벨의 From~To를 맞춰준다
+		spreadLabels(labels, data, volume_data);
+	}
+
+	// 전역변수에 차트 데이터를 저장한다
+	gChartData.set(title, {
+		labels : $.extend({}, labels),
+		data : $.extend({}, data),
+		volume_data : (volume_data ? $.extend({}, volume_data) : null), // 거래량 데이터
+		ma_data : (ma_data ? $.extend({}, ma_data) : null), // 6개월 이동평균 데이터
+		apt : apt // 아파트ID
+	});
+
+	// 차트용 데이터를 구성하고 차트를 그린다
+	drawChart(title, labels, data, apt, volume_data, ma_data);
 
 }
 
 function drawSaleLineChart(apt, title) {
-  if (gOverlayChart && Array.from(gChartData.keys()).includes(title)) {
+
+  if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
 
-  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt+"&ma="+gAptMA, function(jsonData){
+  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
     data = JSON.parse(jsonData);
-    if (gAptMA)
-	title += "[6개월 이동평균]";
-    drawChart(title, data['labels'], data['data'], apt);
+    drawNewChart(title, data['labels'], data['data'], apt, data['cnt'], data['maData']);
   });
 
 }
@@ -436,14 +416,14 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
     title += ")";
   }
 
-  if (gOverlayChart && Array.from(gChartData.keys()).includes(title)) {
+  if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
 
   $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
     data = JSON.parse(jsonData);
-    drawChart(title, data['labels'], data['data']);
+    drawNewChart(title, data['labels'], data['data'], null, data['cnt'], data['ma']);
   });
 }
 
@@ -452,14 +432,14 @@ function drawKBIndex(from_ym, to_ym, region, title) {
   params += "&to_ym=" + to_ym;
   params += "&region=" + region;
 
-  if (gOverlayChart && Array.from(gChartData.keys()).includes(title)) {
+  if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
 
   $.getJSON("{{ config['BASE_URL'] }}getKBIndex?" + params, function(jsonData){
     data = JSON.parse(jsonData);
-    drawChart(title, data['labels'], data['data']);
+    drawNewChart(title, data['labels'], data['data']);
   });
 }
 </script>
@@ -468,7 +448,7 @@ function drawKBIndex(from_ym, to_ym, region, title) {
 <div style='width:100%; margin:20px;'>
     <canvas id="myChart"></canvas>
 </div>
-<div id="aptSaleDiv" class="floating-list">
+<div id="aptSaleDiv" class="floating-list popup">
 <table id="aptSaleTable">
 <thead>
 <tr class="aptSaleListHeader" >

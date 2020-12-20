@@ -3,200 +3,239 @@
 var regions = [];
 var dongs = {};
 var apts = {};
+var draw_options = {};
 
-function setOverlayChart(b) {
-  gOverlayChart = b;
-}
-
-function setRelativeChart(b) {
-  gRelativeChart = b;
-  updateChartBase(null);
-}
-
-function setAptMA(b) {
-  gAptMA = b;
+function setDrawOption(checkbox) {
+	draw_options[checkbox.id] = checkbox.checked;
 }
 
 function constructSel(sel, data) {
-  sel.innerHTML = "";
-  var option = document.createElement("option");
-  option.value = 'all';
-  option.innerText = 'All';
-  sel.appendChild(option);
-  $.each(data, function(idx, r) {
-      option = document.createElement("option");
-      option.value = r[0];
-      option.innerText = r[1];
-      sel.appendChild(option);
-  });
+	sel.empty();
+	var option = document.createElement("option");
+	option.value = 'all';
+	option.innerText = 'All';
+	sel.append(option);
+	$.each(data, function(idx, r) {
+		option = document.createElement("option");
+		option.value = r[0];
+		option.innerText = r[1];
+		sel.append(option);
+	});
 }
 
 function initRegions() {
-  sel = document.getElementById("region");
-  constructSel(sel, regions);
+	sel = $("#region");
+	constructSel(sel, regions);
 }
 
-$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
-        list = JSON.parse(data);
-        regions = list[0];
-        dongs = list[1];
-        initRegions();
-});
-
 function refreshDong(val) {
-  sel = document.getElementById("dong");
-  constructSel(sel, dongs[val]);
+	var sel = $("#dong");
+	constructSel(sel, dongs[val]);
 }
 
 function constructAptSel(region, dong) {
-  var data = [];
-  if ($("#complex").is(":checked")) {
-    $.each(apts[region+dong], function(idx, r) {
-        if (r[2] != null)
-              data.push(r);
-      });
-      list = data;
-  } else {
-    data = apts[region+dong];
-  }
-  constructSel($("#apt")[0], data);
+
+	var data = [];
+	if ($("#complex").is(":checked")) {
+		$.each(apts[region+dong], function(idx, r) {
+			if (r[2] != null)
+				data.push(r);
+		});
+		list = data;
+	} else {
+		data = apts[region+dong];
+	}
+
+	constructSel($("#apt"), data);
 }
 
 function refreshApt() {
-  region = $("#region").val();
-  dong = $("#dong").val();
-  if (apts[region+dong] != null) {
-    constructAptSel(region, dong);
-    return;
-  }
-  url = "{{ config['BASE_URL'] }}getApt?region="+region+"&dong="+dong;
-  $.getJSON(url, function(data){
-    apts[region+dong] = JSON.parse(data);
-    constructAptSel(region, dong);
-  });
+
+	region = $("#region").val();
+	dong = $("#dong").val();
+	if (apts[region+dong] != null) {
+		constructAptSel(region, dong);
+		return;
+	}
+
+	url = "{{ config['BASE_URL'] }}getApt?region="+region+"&dong="+dong;
+	$.getJSON(url, function(data){
+		apts[region+dong] = JSON.parse(data);
+		constructAptSel(region, dong);
+	});
 }
 
 function requestSaleStat() {
-  complex = $('input#complex').is(":checked") ? "Y" : "N";
-  from_ym = $('input#from_ym').val();
-  to_ym = $('input#to_ym').val();
-  ages = $('select#ages').val();
-  age_sign = $('select#age_sign').val();
-  
-  area_type = "";
-  checkboxes = $('input#area_type');
-  for(var i = 0; i < checkboxes.length; i++) {
-    if (checkboxes[i].checked)
-      area_type += checkboxes[i].value;
-  }
-  if (area_type.length == checkboxes.length * 2)
-    area_type = "";
 
-  region = $('select#region').val();
-  if ($("select#dong")[0].selectedIndex <= 0) {
-    dong = "";
-    title = $('select#region option:checked').text();
-  } else {
-    dong = $('select#dong').val();
-    title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
-  }
-  drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
+	var complex = $('input#complex').is(":checked") ? "Y" : "N";
+	var from_ym = $('input#from_ym').val();
+	var to_ym = $('input#to_ym').val();
+	var ages = $('select#ages').val();
+	var age_sign = $('select#age_sign').val();
+  
+	var area_type = "";
+	var checkboxes = $('input#area_type');
+	for(var i = 0; i < checkboxes.length; i++) {
+		if (checkboxes[i].checked)
+			area_type += checkboxes[i].value;
+	}
+	if (area_type.length == checkboxes.length * 2)
+		area_type = "";
+
+	var region = $('select#region').val();
+	var title, dong;
+	if ($("select#dong")[0].selectedIndex <= 0) {
+		dong = "";
+		title = $('select#region option:checked').text();
+	} else {
+		dong = $('select#dong').val();
+		title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
+	}
+
+	drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
 
 }
 
 function requestKBIndex() {
-  from_ym = $('input#from_ym').val();
-  to_ym = $('input#to_ym').val();
+
+	from_ym = $('input#from_ym').val();
+	to_ym = $('input#to_ym').val();
   
-  region = $('select#region').val();
-  title = "KB지수[" + $('select#region option:checked').text() + "]";
+	region = $('select#region').val();
+	title = "KB지수[" + $('select#region option:checked').text() + "]";
 
-  if (!gRelativeChart) {
-	  if (!confirm("KB 지수는 상대수치로만 조회 가능합니다. 상대수치 조회로 변경하시겠습니까?"))
-		  return ;
-	  $('#ckbox_kbindex').prop("checked", true).trigger("change");
-  }
+	drawKBIndex(from_ym, to_ym, region, title);
 
-  drawKBIndex(from_ym, to_ym, region, title);
 }
 
 function set_button(sel) {
 
-  if (sel.id == 'dong') return;
+	if (sel.id == 'dong') return;
 
-  if (sel.value=='all') { 
-    document.all.region_btn.disabled = true; 
-    document.all.kbindex_btn.disabled = true; 
-  } else { 
-    document.all.region_btn.disabled = false;
-    document.all.kbindex_btn.disabled = false;
-  }
+	if (sel.value=='all') { 
+		$('#region_btn').attr('disabled', true);
+		$('#kbindex_btn').attr('disabled', true);
+	} else { 
+		$('#region_btn').attr('disabled', false);
+		$('#kbindex_btn').attr('disabled', false);
+	}
 }
 
 function toggleTerms() {
-  if(document.getElementById('toggle_term').style.display === 'block') {
-    document.getElementById('toggle_term').style.display = 'none';
-    document.getElementById('toggle_btn').textContent = '▼ 보이기';
-  } else {
-    document.getElementById('toggle_term').style.display = 'block';
-    document.getElementById('toggle_btn').textContent = '▲ 숨기기';
-  }
+	if($('#toggle_term').is(':visible')) {
+		$('#toggle_term').hide();
+		$('#toggle_btn').text('▼ 보이기');
+	} else {
+		$('#toggle_term').show();
+		$('#toggle_btn').text('▲ 숨기기');
+	}
 }
+
+function toggleYMTable(btn, target) {
+	var div = $("#ym_table_div");
+	if (div.is(':visible')) {
+		$('#ym_table_div').hide();
+		$('#toggle_btn').text('▼ 보이기');
+	} else {
+		var pos = btn.position();
+		div.attr("target", target);
+		div.css({top: (pos.top+btn.outerHeight())+'px', left: pos.left+'px', display: 'block'});
+	}
+}
+
+$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
+	list = JSON.parse(data);
+	regions = list[0];
+	dongs = list[1];
+	initRegions();
+});
 
 </script>
 <div class="sidebar" style="width:200px; margin-left:5px;">
-  <div class="my-box">
-  <span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a>
-  <div id=toggle_term style="display:none;">
-	  <input type=checkbox id=complex onchange="refreshApt();">등록된 단지만</input><br>
-  <label>매매기간:</label><br><input id=from_ym maxlength=6 size=6 style="width:70px;"> ~ <input id=to_ym maxlength=6 size=6 style="width:70px;"><br>
-  <label>연식:</label>
-    <select id=ages>
-      <option value="">ALL</option>
-      {%for i in range(1, 20)%} 
-      <option value= {{ i }} > {{ i }} </option>
-      {%endfor%} 
-    </select> 년
-    <select id=age_sign>
-	  <option value="<">이내</option>
-	  <option value=">">이상</option>
-    </select><br>
-  <label>전용면적</label><br>
-      <input type=checkbox id=area_type value=01 checked>60m<sup>2</sup> 이하<br>
-      <input type=checkbox id=area_type value=02 checked>60~85m<sup>2</sup> 이하<br>
-      <input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
-      <input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
-  </div>
-  </div>
-<br>
-  <div class="my-box">
-  <label><strong>지역 선택</strong></label><br>
-  <label>구 : </label>
-  <select onchange="set_button(this); refreshDong(this.value);" name="region" id="region" style="width:100%;">
-    <option value="all">all</option>
-  </select><br>
-  <label>동 : </label>
-  <br>
-  <select onchange="set_button(this); refreshApt();" name="dong" id="dong" style="width:100%;">
-    <option value="all">All</option>
-  </select><br>
-  <center>
-  <button id='region_btn' onclick="requestSaleStat();" disabled>평균평단가 조회</button>
-  <button id='kbindex_btn' onclick="requestKBIndex();" disabled>KB 구별 아파트지수 조회</button>
-  </center>
-  </div>
-  <br>
-  <div class="my-box">
-  <label><strong>동별 아파트 선택</strong></label>
-  <select onchange="if (this.selectedIndex == 0) return false; drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
-  </select>
-  <input type=checkbox onchange="setAptMA(this.checked);">6개월 이동평균으로 조회하기</input><br>
-  </div>
-  <br>
-  <div class="my-box">
-  <label><strong>차트 옵션</strong></label><br>
-  <input type=checkbox onchange="setOverlayChart(this.checked);">겹쳐 그리기</input><br>
-  <input id=ckbox_kbindex type=checkbox onchange="setRelativeChart(this.checked);">상대수치로 그리기</input>
-  </div>
-  <br>
+	<div class="my-box">
+	<label>조회기간:</label><br>
+		<span style="font-size:small;">디폴트는 2006.01 ~ 현재 월</span><br>
+		<input id=from_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym');">▼</a> ~ 
+		<input id=to_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym'); return false;">▼</a><br>
+	</div>
+	<div class="my-box">
+		<label><strong>지역 선택</strong></label><br>
+		<label>구 : </label>
+			<select onchange="set_button(this); refreshDong(this.value);" name="region" id="region" style="width:100%;">
+				<option value="all">all</option>
+			</select><br>
+		<label>동 : </label>
+		<br>
+			<select onchange="set_button(this); refreshApt();" name="dong" id="dong" style="width:100%;">
+				<option value="all">All</option>
+			</select><br>
+		<center><button id='region_btn' onclick="requestSaleStat();" disabled>평균평단가 조회</button></center>
+		<span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a>
+		<div id=toggle_term style="display:none;">
+			<label>연식:</label>
+				<select id=ages>
+					<option value="">ALL</option>
+					{%for i in range(1, 20)%} 
+					<option value={{i}}>{{i}}</option>
+					{%endfor%} 
+				</select> 년
+				<select id=age_sign>
+					<option value="<">이내</option>
+					<option value=">">이상</option>
+				</select><br>
+			<label>전용면적</label><br>
+				<input type=checkbox id=area_type value=01 checked>60m<sup>2</sup> 이하<br>
+				<input type=checkbox id=area_type value=02 checked>60~85m<sup>2</sup> 이하<br>
+				<input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
+				<input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
+		</div>
+		<center><button id='kbindex_btn' onclick="requestKBIndex();" disabled>KB 구별 아파트지수 조회<br><span style="font-size:small;">(스케일을 맞추가 위해 40배한 값)</span></button></center>
+	</div>
+	<br>
+	<div class="my-box">
+		<label><strong>동별 아파트 선택</strong></label><br>
+			<input type=checkbox id=complex onchange="refreshApt();">등록된 단지만</input><br>
+			<select onchange="if (this.selectedIndex == 0) return false; drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
+			</select>
+	</div>
+	<br>
+	<div class="my-box">
+		<label><strong>차트 옵션</strong></label><br>
+			<input id=draw_overlap type=checkbox onchange="setDrawOption(this);">겹쳐 그리기</input><br>
+			<input id=draw_relative type=checkbox onchange="setDrawOption(this); updateChart();">상대수치로 보기</input><br>
+			<input id=draw_ma type=checkbox onchange="setDrawOption(this); updateChart();">6개월 이동평균 같이 보기</input><br>
+			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
+	</div>
+	<br>
 </div>
+<div id="ym_table_div" class=popup style="display: none; position:absolute; z-index:999;">
+<table id="ym_table">
+	<tbody>
+	</tbody>
+</table>
+</div>
+<script>
+$(document).ready(function(){ 
+	var today = new Date();
+	var ym = today.getFullYear() * 100 + today.getMonth()+1;
+	for(var y = 2006; y < ym / 100; y++) {
+		var html = "<tr>";
+		for(var m = 1; m <= 12; m++) {
+			html += "<td class=one_ym>" + (y*100+m <= ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
+		}
+		html += "</tr>:"
+		$('#ym_table > tbody:last').append(html);
+	};
+	$('.one_ym').click( function() {
+		var div = $('#ym_table_div');
+		var target = div.attr("target");
+		$('#'+target).val($(this).text());
+		div.hide();
+	});
+	$(window).click(function(e) {
+		$('.popup').hide();
+	});
+});
+
+</script>
+

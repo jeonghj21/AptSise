@@ -5,29 +5,29 @@ table.ui-datepicker-calendar { display:none; }
 .floating-list {
 	display: none;
 	z-index: 999;
-        position: absolute;
-        background-color: #ffffff;
+	position: absolute;
+	background-color: #ffffff;
 	width: 550px;
 	overflow: auto;
-      }
+}
 table.aptSaleList {
-      width: 100%;
-      border-top: 1px solid #444444;
-      border-collapse: collapse;
-    }
+	width: 100%;
+	border-top: 1px solid #444444;
+	border-collapse: collapse;
+}
 .aptSaleListItem {
-      border-bottom: 1px solid #444444;
-    padding: 10px;
-      text-align: center;
-  }
+	border-bottom: 1px solid #444444;
+	padding: 10px;
+	text-align: center;
+}
 .aptSaleListHeader {
-      background-color: #0d47a1;
-      color: #ffffff;
-    }
+	background-color: #0d47a1;
+	color: #ffffff;
+}
 tbody tr:nth-child(2n) {
-   background-color: #bbdefb;
-      }
+	background-color: #bbdefb;
+}
 tbody tr:nth-child(2n+1) {
-      background-color: #e3f2fd;
-      }
+	background-color: #e3f2fd;
+}
 </style>
