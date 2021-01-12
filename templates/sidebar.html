@@ -207,6 +207,10 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
 	</div>
 	<br>
+<!--	<div class="my-box">
+		<center><button onclick="enterRemark();">의견 보내기</button></center>
+	</div>
+-->
 </div>
 <div id="ym_table_div" class=popup style="display: none; position:absolute; z-index:999;">
 <table id="ym_table">
@@ -231,6 +235,11 @@ $(document).ready(function(){
 		var target = div.attr("target");
 		$('#'+target).val($(this).text());
 		div.hide();
+	});
+	$(".one_ym").hover(function(){
+		$(this).css("background-color", "yellow");
+    }, function(){
+		$(this).css("background-color", $(this).parent().css("background-color"));
 	});
 	$(window).click(function(e) {
 		$('.popup').hide();

@@ -210,24 +210,25 @@ def getSaleStat():
 
 @app.route("/getAptSale")
 def getAptSale():
-    params = request.args.to_dict()
-    apt = params['apt']
-    ym = params['ym']
-    sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale_new"
-    sql += " where apt_id = " + apt + " and ym = '" + ym + "'"
-    sql += " order by saled"
-    with app.engine.connect() as connection:
-        result = connection.execute(text(sql))
+	params = request.args.to_dict()
+	apt = params['apt']
+	sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale_new"
+	sql += " where apt_id = " + apt 
+	if 'ym' in params:
+		sql += " and ym = '" + params['ym'] + "'"
+	sql += " order by saled"
+	with app.engine.connect() as connection:
+		result = connection.execute(text(sql))
 
-    rows=result.fetchall()            
+	rows=result.fetchall()            
 
-    data = []
-    for r in rows:
-        data.append([ r['dt'], r['area'], r['floor'], r['price'] ])
+	data = []
+	for r in rows:
+		data.append([ r['dt'], r['area'], r['floor'], r['price'] ])
 
-    json_return=json.dumps(data)   #string #json
+	json_return=json.dumps(data)   #string #json
  
-    return jsonify(json_return)
+	return jsonify(json_return)
 
 
 @app.route("/getKBIndex")
@@ -257,4 +258,17 @@ def getKBIndex():
     json_return=json.dumps(json_data)   #string #json
  
     return jsonify(json_return)
+
+INSERT_USER_REMARKS = text("insert into user_remarks values(null, :ip, :browser, str_to_date(:dt, '%Y%m%d%H%i%S'), :remarks, :email)")
+
+@app.route("/remarks")
+def remarks():
+	now = datetime.datetime.now()
+	try:
+		with app.engine.connect() as conn:
+			conn.execute(INSERT_USER_REMARKS, ip=request.remote_addr, dt=now.strftime('%Y%m%d%H%M%S'))
+	except Exception as e:
+		print(str(e))
+
+	return render_template('index.html')
 

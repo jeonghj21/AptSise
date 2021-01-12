@@ -334,3 +334,5 @@ update apt_sale_stats_new a set unit_price_6ma = (select ma from (select region,
 
 select a.ym, a.unit_price, b.unit_price ma from (select apt_id, ym, round(avg(price/(area/3.3)), 2) unit_price from apt_sale_new where apt_id = 1 group by ym) a,  apt_sale_ma_new b where b.apt_id =a.apt_id and a.ym = b.ym and b.ma=6 order by a.ym
 
+create table user_remarks (id int not null auto_increment primary key, ip varchar(20) not null, browser varchar(100), dt datetime, remarks varchar(1000), email varchar(100));
+

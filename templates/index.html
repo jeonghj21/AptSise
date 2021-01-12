@@ -33,6 +33,13 @@ function setPopupPosition(event, popup) {
 	    return popupPosition; 
 } 
 
+function enterRemark() {
+  var div = $("#enterRemark");
+  var y = ($(window).height() - div.outerHeight() ) / 2;
+  var x = ($(window).width() - div.outerWidth() ) / 2;
+  div.css({top: y+'px', left: x+'px', display: 'block'});
+}
+
 function showAptSaleTable(event, data) {
   $('#aptSaleTable > tbody:last').empty();
   $.each(data, function(idx, r) {
@@ -74,6 +81,179 @@ function removeRightYAxe() {
 	myChart['options']['scales']['yAxes'].pop();
 }
 
+function hideChart(btn, index) {
+	if (myChart == null || myChart.data.datasets.length <= index || index < 0)
+		return;
+
+	legend = $('#legend'+index);
+	if (legend.css('text-decoration').startsWith('line-through')) {
+		myChart.data.datasets[index].hidden = false;
+		legend.css('text-decoration', 'none');
+		btn.text('숨기기');
+	} else {
+		myChart.data.datasets[index].hidden = true;
+		legend.css('text-decoration', 'line-through');
+		btn.text('보이기');
+	}
+	myChart.update();
+
+}
+
+function makeChart2TableHTML(chart) {
+	var html = "<tr>";
+	html += "<th>년월</th>";
+	html += "<th>평균평단가</th>";
+	html += "<th>평균평단가(6MA)</th>";
+	html += "<th>거래건수</th>";
+	html += "</tr>";
+	var labels = Object.values(chart.labels);
+	var data = Object.values(chart.data);
+	var volume_data = Object.values(chart.volume_data);
+	var ma_data = Object.values(chart.ma_data);
+	for(var i = 0; i < data.length; i++) {
+		html += "<tr>";
+		html += "<td>"+labels[i]+"</td>";
+		html += "<td>"+(data[i]==null?"":data[i])+"</td>";
+		html += "<td>"+(ma_data[i]==null?"":ma_data[i])+"</td>";
+		html += "<td>"+(volume_data[i]==null?"":volume_data[i])+"</td>";
+		html += "</tr>";
+	}
+	return html;
+}
+
+function excelChart(index) {
+	if (myChart == null || myChart.data.datasets.length <= index || index < 0)
+		return;
+
+	var title = myChart.data.datasets[index].label;
+	var chart = gChartData.get(title);
+
+	table2excel(title, makeChart2TableHTML(chart) );
+}
+
+function table2excel(title, table) {
+	var tab_text = '<html xmlns:x="urn:schemas-microsoft-com:office:excel">';
+	tab_text += '<head><meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">';
+	tab_text += '<xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+	tab_text += '<x:Name>Chart Data</x:Name>';
+	tab_text += '<x:WorksheetOptions><x:Panes></x:Panes></x:WorksheetOptions></x:ExcelWorksheet>';
+	tab_text += '</x:ExcelWorksheets></x:ExcelWorkbook></xml></head><body>';
+	tab_text += "<table border='1px'>";
+
+	tab_text += table;
+
+	tab_text += '</table></body></html>';
+	var data_type = 'data:application/vnd.ms-excel';
+	var ua = window.navigator.userAgent;
+	var msie = ua.indexOf("MSIE ");
+	var fileName = title + '.xls';
+	//Explorer 환경에서 다운로드
+	if (msie > 0 || !!navigator.userAgent.match(/Trident.*rv\:11\./)) {
+		if (window.navigator.msSaveBlob) {
+			var blob = new Blob([tab_text], {
+				type: "application/csv;charset=utf-8;"
+			});
+			navigator.msSaveBlob(blob, fileName);
+		}
+	} else {
+		var blob2 = new Blob([tab_text], {
+			type: "application/csv;charset=utf-8;"
+		});
+		var filename = fileName;
+		var elem = window.document.createElement('a');
+		elem.href = window.URL.createObjectURL(blob2);
+		elem.download = filename;
+		document.body.appendChild(elem);
+		elem.click();
+		document.body.removeChild(elem);
+	}
+}
+
+function excelSales(index, apt) {
+	if (myChart == null || myChart.data.datasets.length <= index || index < 0)
+		return;
+
+	var title = myChart.data.datasets[index].label;
+
+	$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt, function(jsonData){
+		data = JSON.parse(jsonData);
+		var html = "<tr>";
+		html += "<th>거래일</th>";
+		html += "<th>전용면적(제곱미터)</th>";
+		html += "<th>전용면적(평)</th>";
+		html += "<th>층</th>";
+		html += "<th>거래금액(만원)</th>";
+		html += "<th>평단가(만원)</th>";
+		html += "</tr>";
+		$.each(data, function(idx, r) {
+	  		var area = parseFloat(r[1]);
+	  		var price = parseInt(r[3].replace(/,/g,""));
+			html += "<tr>";
+			html += "<td>" + r[0] + "</td>";
+			html += "<td>" + r[1] + "</td>";
+			html += "<td>" + (area/3.3).toFixed(1) + "</td>";
+			html += "<td>" + r[2] + "</td>";
+			html += "<td>" + r[3] + "</td>";
+			var unit_price = (price / (area/3.3)).toFixed(1);
+			unit_price = unit_price.toString().replace(/(\d)(?=(?:\d{3})+(?!\d))/g, "$1,");
+			html += "<td>" + unit_price + "</td>";
+			html += "</tr>";
+		});
+		table2excel(title+'(거래목록)', html);
+	});
+}
+
+function delChart(index) {
+	if (myChart == null || myChart.data.datasets.length <= index || index < 0)
+		return;
+
+	label = myChart.data.datasets[index].label;
+	chart = gChartData.get(label);
+	if (chart == 'undefined')
+		return;
+
+	// 차트 데이터와 차트를 삭제한다
+	gChartData.delete(myChart.data.datasets[index].label);
+	myChart.data.datasets.splice(index, 1);
+
+	// 기본 차트에 이동평균 또는 거래량 차트가 추가되어 있으면 그것도 지운다
+	for(i = 0; i < myChart.data.datasets.length; i++) {
+		if (myChart.data.datasets[i].label.startsWith(label)) {
+			myChart.data.datasets.splice(i, 1);
+			i--;
+		}
+	}
+	$('#chartLegend').html(myChart.generateLegend()); 
+	myChart.update();
+
+}
+
+function drawLegend(chart) {
+
+	var text = []; 
+
+	for (i = 0, j = 0; i <chart.data.datasets.length; i++) { 
+		var data = gChartData.get(chart.data.datasets[i].label);
+		if (data == undefined)
+			continue;
+		if (j > 0)
+			text.push("&nbsp;|&nbsp;");
+		text.push('<span class="line" id="legend'+i+'" style="background-color:' + chart.data.datasets[i].borderColor + '; font-size:small;">'); 
+		text.push(chart.data.datasets[i].label+'</span>');
+		text.push("<button onclick='hideChart($(this), "+i+");'>숨기기</button>");
+		text.push("<button onclick='delChart("+i+");'>삭제</button>");
+		text.push("<button onclick='excelChart("+i+");'>엑셀</button>");
+		if (data.apt != undefined) {
+			text.push("<button onclick='excelSales("+i+","+data.apt+");'>거래목록XLS</button>");
+		}
+		j++;
+	}
+
+	return text.join("");
+
+}
+
+
 function createChart(title, labels) {
 	var ctx = document.getElementById("myChart").getContext("2d");
 	myChart = new Chart (ctx, {
@@ -89,6 +269,10 @@ function createChart(title, labels) {
 					type: 'linear',
 					position: 'left'
 				}]
+			},
+			legend: false,
+			legendCallback: function(chart) {
+				return drawLegend(chart);
 			}
 		}
 	});
@@ -312,8 +496,13 @@ function drawChart(title, labels, data, apt, volume_data, ma_data){
 
 	// 거래량 같이 그리기
 	if (draw_options['draw_volume'] && volume_data) {
-		makeChartDataset('bar', title + ":거래건수", 'B', volume_data);
+		if (myChart['options']['scales']['yAxes'].length == 1)
+			addRightYAxe();
+
+		makeChartDataset('bar', title + "(거래건수)", 'B', volume_data);
 	}
+
+	$('#chartLegend').html(myChart.generateLegend()); 
 
 	myChart.update();
 
@@ -446,6 +635,7 @@ function drawKBIndex(from_ym, to_ym, region, title) {
 
 {% include 'container.html' %}
 <div style='width:100%; margin:20px;'>
+	<div id="chartLegend" class="chartjs-legend"></div>
     <canvas id="myChart"></canvas>
 </div>
 <div id="aptSaleDiv" class="floating-list popup">
@@ -461,6 +651,12 @@ function drawKBIndex(from_ym, to_ym, region, title) {
 </thead>
 <tbody></tbody>
 </table>
+</div>
+<div id="enterRemark" class="floating-list popup" style="width:400px; height:300px;">
+<label><center>의견을 자유롭게 적어주세요</center></label>
+<textarea id=remark style="width:100%;" rows=10></textarea>
+<button onclick="sendRemark();">보내기</button>
+<button onclick="$('enterRemark').hide();">취소</button>
 </div>
 
 {% include 'bottom.html' %}

@@ -30,4 +30,42 @@ tbody tr:nth-child(2n) {
 tbody tr:nth-child(2n+1) {
 	background-color: #e3f2fd;
 }
+<style type="text/css"> 
+.chartjs-legend ol, .chartjs-legend ul { 
+	list-style: none; 
+	margin:0; 
+	padding:0; 
+	text-align:right; 
+} 
+.chartjs-legend li { 
+	cursor:pointer; 
+	display: inline-table; 
+	margin: 10px 4px; 
+} 
+.chartjs-legend li span.bar{ 
+	position:relative; 
+	padding: 0px 10px; 
+	margin: 5px; 
+	border-radius:100px; 
+	color:white; 
+} 
+.chartjs-legend li span.line{ 
+	position:relative; 
+	padding: 1px 10px; 
+	margin: 5px; 
+	color:white; 
+} 
+.chartjs-legend li div.line{ 
+	float:left; 
+	height:2px; 
+	background:#000; 
+	font-size:0; 
+	line-height:0; 
+	width:25px; 
+	padding:1px 0px; 
+	border-radius:100px; 
+	margin: 9px 5px; 
+}
+
+출처: https://risha-lee.tistory.com/18 [리샤의 개발 일지]
 </style>
