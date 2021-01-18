@@ -272,3 +272,48 @@ def remarks():
 
 	return render_template('index.html')
 
+@app.route("/getSaleStatTotal")
+def getSaleStatTotal():
+	params = request.args.to_dict()
+	complex_only = params['complex']
+	from_ym = params['from_ym']
+	to_ym = params['to_ym']
+	area_type = params['area_type']
+	ages = params['ages']
+	age_sign = params['age_sign']
+
+	sql = " select ym, cast(round(avg(unit_price), 0) as signed) unit_price, "
+	sql += " cast(sum(cnt) as signed) cnt, cast(round(avg(unit_price_6ma), 0) as signed) unit_price_6ma"
+	sql += " from("
+	sql += " select * from apt_sale_stats_new where 1 = 1"
+	if complex_only != "":
+		sql += " and complex_flag = '" + complex_only + "'"
+	if from_ym != "":
+		sql += " and ym >= '" + from_ym + "'"
+	if to_ym != "":
+		sql += " and ym <= '" + to_ym + "'"
+	if area_type != "":
+		sql += " and ("
+	pos = 0
+	while (len(area_type) > pos):
+		if (pos > 0):
+			sql += " or "
+			sql += " area_type = '" + area_type[pos:pos+2] + "'"
+		pos = pos + 2
+	if ages != "" and age_sign != "":
+		sql += " and " + str(date.today().year - int(ages)) + age_sign + " made_year"
+	sql += " ) a  group by ym"
+	sql += " order by ym"
+
+	with app.engine.connect() as connection:
+		result = connection.execute(text(sql))
+
+	rows=result.fetchall()            
+	json_data = { 'labels': [], 'data':[], 'cnt':[], 'ma':[] }
+
+	spreadDataForYM(rows, 'ym', json_data['labels'], [['unit_price', json_data['data']], ['cnt', json_data['cnt']], ['unit_price_6ma', json_data['ma']]])
+
+	json_return=json.dumps(json_data)   #string #json
+ 
+	return jsonify(json_return)
+

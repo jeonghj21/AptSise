@@ -9,11 +9,11 @@ function setDrawOption(checkbox) {
 	draw_options[checkbox.id] = checkbox.checked;
 }
 
-function constructSel(sel, data) {
+function constructSel(sel, data, allTitle, allValue) {
 	sel.empty();
 	var option = document.createElement("option");
-	option.value = 'all';
-	option.innerText = 'All';
+	option.value = allValue;
+	option.innerText = allTitle;
 	sel.append(option);
 	$.each(data, function(idx, r) {
 		option = document.createElement("option");
@@ -25,12 +25,12 @@ function constructSel(sel, data) {
 
 function initRegions() {
 	sel = $("#region");
-	constructSel(sel, regions);
+	constructSel(sel, regions, "서울 전체", "11000");
 }
 
 function refreshDong(val) {
 	var sel = $("#dong");
-	constructSel(sel, dongs[val]);
+	constructSel(sel, dongs[val], "구 전체", "00000");
 }
 
 function constructAptSel(region, dong) {
@@ -46,7 +46,7 @@ function constructAptSel(region, dong) {
 		data = apts[region+dong];
 	}
 
-	constructSel($("#apt"), data);
+	constructSel($("#apt"), data, "아파트를 선택하세요", "All");
 }
 
 function refreshApt() {
@@ -96,31 +96,6 @@ function requestSaleStat() {
 
 }
 
-function requestKBIndex() {
-
-	from_ym = $('input#from_ym').val();
-	to_ym = $('input#to_ym').val();
-  
-	region = $('select#region').val();
-	title = "KB지수[" + $('select#region option:checked').text() + "]";
-
-	drawKBIndex(from_ym, to_ym, region, title);
-
-}
-
-function set_button(sel) {
-
-	if (sel.id == 'dong') return;
-
-	if (sel.value=='all') { 
-		$('#region_btn').attr('disabled', true);
-		$('#kbindex_btn').attr('disabled', true);
-	} else { 
-		$('#region_btn').attr('disabled', false);
-		$('#kbindex_btn').attr('disabled', false);
-	}
-}
-
 function toggleTerms() {
 	if($('#toggle_term').is(':visible')) {
 		$('#toggle_term').hide();
@@ -161,15 +136,15 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 	<div class="my-box">
 		<label><strong>지역 선택</strong></label><br>
 		<label>구 : </label>
-			<select onchange="set_button(this); refreshDong(this.value);" name="region" id="region" style="width:100%;">
-				<option value="all">all</option>
+			<select onchange="refreshDong(this.value);" name="region" id="region" style="width:100%;">
+				<option value="11000">all</option>
 			</select><br>
 		<label>동 : </label>
 		<br>
-			<select onchange="set_button(this); refreshApt();" name="dong" id="dong" style="width:100%;">
-				<option value="all">All</option>
+			<select onchange="refreshApt();" name="dong" id="dong" style="width:100%;">
+				<option value="00000">구 전체</option>
 			</select><br>
-		<center><button id='region_btn' onclick="requestSaleStat();" disabled>평균평단가 조회</button></center>
+		<center><button id='region_btn' onclick="requestSaleStat();">평균평단가 조회</button></center>
 		<span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a>
 		<div id=toggle_term style="display:none;">
 			<label>연식:</label>
@@ -189,7 +164,6 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 				<input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
 				<input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
 		</div>
-		<center><button id='kbindex_btn' onclick="requestKBIndex();" disabled>KB 구별 아파트지수 조회<br><span style="font-size:small;">(스케일을 맞추가 위해 40배한 값)</span></button></center>
 	</div>
 	<br>
 	<div class="my-box">

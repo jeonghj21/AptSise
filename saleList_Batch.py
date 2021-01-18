@@ -138,7 +138,7 @@ def execute_dml(job_key, sql, params = None, job_log = True):
 
 	return rows
 
-UPDATE_JOB_LOG_FAIL = "update job_log set end_dt = str_to_date(%s, '%Y%m%d%H%i%S'), result='Y' where job_key = %s"
+UPDATE_JOB_LOG_FAIL = "update job_log set end_dt = str_to_date(%s, '%Y%m%d%H%i%S'), result='N' where job_key = %s"
 
 def job_fail(job_key):
 	now = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
@@ -290,6 +290,14 @@ INSERT_APT_SALE_STATS_NEW = """
 	 group by region, dong, made_year, area_type, ym
 """
 
+INSERT_APT_SALE_STATS_NEW_TOTAL = """
+	insert into apt_sale_stats_new
+	 select '11000', '00000', made_year, area_type, ym, avg(price/(area/3.3)), 0, count(*), 'N'
+	 from apt_sale_new a, apt_master_new b
+	 where a.apt_id = b.id and a.ym = %s
+	 group by made_year, area_type, ym
+"""
+
 UPDATE_APT_SALE_STATS_MA = """
 	update apt_sale_stats_new a set unit_price_6ma = 
 	 (select ma from 
@@ -352,7 +360,7 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_TOTAL, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 

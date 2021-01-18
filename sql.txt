@@ -336,3 +336,49 @@ select a.ym, a.unit_price, b.unit_price ma from (select apt_id, ym, round(avg(pr
 
 create table user_remarks (id int not null auto_increment primary key, ip varchar(20) not null, browser varchar(100), dt datetime, remarks varchar(1000), email varchar(100));
 
+select region_name, rate from (select a.region, (sum(b.unit_price*b.cnt)/sum(b.cnt)) / (sum(a.unit_price*a.cnt)/sum(a.cnt)) rate from apt_sale_stats_new a, apt_sale_stats_new b where a.ym
+ between '201901' and '201912' and b.ym between '202001' and '202012' and a.region=b.region group by a.region) a, ref_region b where a.region=b.region_cd order by rate desc limit 10;
+
+
+select a.*, r.region_name 
+	from (
+		select round(a.price / b.price, 2) rate, a.region, a.price c_price, b.price p_price, a.cnt c_cnt, b.cnt p_cnt
+			from (
+				select region, round(sum(unit_price*cnt) / sum(cnt), 2) price, sum(cnt) cnt
+					from apt_sale_stats_new
+					where ym between %s and %s
+					group by region
+				) a
+			left join (
+				select region, round(sum(unit_price*cnt) / sum(cnt), 2) price, sum(cnt) cnt
+					from apt_sale_stats_new
+					where ym between %s and %s
+					group by region
+				) b
+			on a.region = b.region
+	) a, ref_region r
+	where a.region = r.region_cd
+	order by rate desc;
+
+select a.*, r.region_name, d.dong_name 
+	from ( 
+		select round(a.price / b.price, 2) rate, a.region, a.dong, a.price c_price, b.price p_price, a.cnt c_cnt, b.cnt p_cnt
+			from (
+				select region, dong, round(sum(unit_price*cnt) / sum(cnt), 2) price, sum(cnt) cnt
+					from apt_sale_stats_new
+					where ym between %s and %s
+					group by region, dong
+			) a
+		left join (
+				select region, dong, round(sum(unit_price*cnt) / sum(cnt), 2) price, sum(cnt) cnt
+					from apt_sale_stats_new
+					where ym between %s and %s
+					group by region, dong
+			) b
+		on a.region = b.region
+	) a, apt_dong d, ref_region r
+	where a.dong = d.dong_cd and a.region = d.region_cd and d.region_cd = r.region_cd
+		and c_cnt > 50 and p_cnt > 50
+	order by rate desc
+	limit 20
+
