@@ -106,12 +106,17 @@ function toggleTerms() {
 	}
 }
 
-function toggleYMTable(btn, target) {
-	var div = $("#ym_table_div");
+function toggleYMTable(btn, target, desc) {
+	var div;
+	if (desc)
+		div = $("#ym_table_desc_div");
+	else
+		div = $("#ym_table_asc_div");
 	if (div.is(':visible')) {
-		$('#ym_table_div').hide();
+		$('.pop').hide();
 		$('#toggle_btn').text('▼ 보이기');
 	} else {
+		$('.pop').hide();
 		var pos = btn.position();
 		div.attr("target", target);
 		div.css({top: (pos.top+btn.outerHeight())+'px', left: pos.left+'px', display: 'block'});
@@ -130,11 +135,11 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 	<div class="my-box">
 	<label>조회기간:</label><br>
 		<span style="font-size:small;">디폴트는 2006.01 ~ 현재 월</span><br>
-		<input id=from_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym');">▼</a> ~ 
-		<input id=to_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym'); return false;">▼</a><br>
+		<input id=from_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym', false);">▼</a> ~ 
+		<input id=to_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym', true); return false;">▼</a><br>
 	</div>
 	<div class="my-box">
-		<label><strong>지역 선택</strong></label><br>
+		<label><strong>지역/아파트 선택</strong></label><br>
 		<label>구 : </label>
 			<select onchange="refreshDong(this.value);" name="region" id="region" style="width:100%;">
 				<option value="11000">all</option>
@@ -145,7 +150,7 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 				<option value="00000">구 전체</option>
 			</select><br>
 		<center><button id='region_btn' onclick="requestSaleStat();">평균평단가 조회</button></center>
-		<span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a>
+		<span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a><br>
 		<div id=toggle_term style="display:none;">
 			<label>연식:</label>
 				<select id=ages>
@@ -164,11 +169,8 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 				<input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
 				<input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
 		</div>
-	</div>
-	<br>
-	<div class="my-box">
-		<label><strong>동별 아파트 선택</strong></label><br>
-			<input type=checkbox id=complex onchange="refreshApt();">등록된 단지만</input><br>
+		<label>아파트 : </label>&nbsp;&nbsp;
+			<input type=checkbox id=complex onchange="refreshApt();">단지만</input><br>
 			<select onchange="if (this.selectedIndex == 0) return false; drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
 			</select>
 	</div>
@@ -177,17 +179,31 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 		<label><strong>차트 옵션</strong></label><br>
 			<input id=draw_overlap type=checkbox onchange="setDrawOption(this);">겹쳐 그리기</input><br>
 			<input id=draw_relative type=checkbox onchange="setDrawOption(this); updateChart();">상대수치로 보기</input><br>
-			<input id=draw_ma type=checkbox onchange="setDrawOption(this); updateChart();">6개월 이동평균 같이 보기</input><br>
+			<input id=draw_ma type=checkbox onchange="setDrawOption(this); updateChart();">연간 이동평균 같이 보기</input><br>
 			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
 	</div>
 	<br>
-<!--	<div class="my-box">
-		<center><button onclick="enterRemark();">의견 보내기</button></center>
+	<div class="my-box">
+		<label><strong>연간 평단가 순위 조회</strong></label><br>
+			<input id=base_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS 
+				<select id=years>
+					{%for i in range(1, 20)%} 
+					<option value={{i}}>{{i}}</option>
+					{%endfor%} 
+				</select>년전<br>
+			<button onclick="drawRankChart('Region', $('#base_ym').val(), $('#years option:selected').val());">구별 순위</button><br>
+			<button onclick="drawRankChart('Dong', $('#base_ym').val(), $('#years option:selected').val());">동별 순위</button><br>
+			<button onclick="drawRankChart('Apt', $('#base_ym').val(), $('#years option:selected').val());">아파트별 순위</button><br>
 	</div>
--->
 </div>
-<div id="ym_table_div" class=popup style="display: none; position:absolute; z-index:999;">
-<table id="ym_table">
+<div id="ym_table_asc_div" class=popup style="display: none; position:absolute; z-index:999;">
+<table id="ym_table_asc">
+	<tbody>
+	</tbody>
+</table>
+</div>
+<div id="ym_table_desc_div" class=popup style="display: none; position:absolute; z-index:999;">
+<table id="ym_table_desc">
 	<tbody>
 	</tbody>
 </table>
@@ -202,10 +218,18 @@ $(document).ready(function(){
 			html += "<td class=one_ym>" + (y*100+m <= ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
 		}
 		html += "</tr>:"
-		$('#ym_table > tbody:last').append(html);
+		$('#ym_table_asc > tbody:last').append(html);
+	};
+	for(var y = Number.parseInt(ym / 100); y >= 2006; y--) {
+		var html = "<tr>";
+		for(var m = 1; m <= 12; m++) {
+			html += "<td class=one_ym>" + (y*100+m <= ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
+		}
+		html += "</tr>:"
+		$('#ym_table_desc > tbody:last').append(html);
 	};
 	$('.one_ym').click( function() {
-		var div = $('#ym_table_div');
+		var div = $($(this).parents('div')[0]);
 		var target = div.attr("target");
 		$('#'+target).val($(this).text());
 		div.hide();

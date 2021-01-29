@@ -65,7 +65,7 @@ function showAptSaleTable(event, data) {
   div.css({top: pos.y+'px', left: pos.x+'px', display: 'block'});
 }
 
-function addRightYAxe() {
+function addRightYAxe(additionalParams) {
 	if (myChart == null) return;
 
 	myChart['options']['scales']['yAxes'].push({
@@ -76,6 +76,8 @@ function addRightYAxe() {
 			min: 0
 		}
 	});
+	if (additionalParams)
+		myChart['options']['scales']['yAxes'].push(additionalParams);
 
 }
 
@@ -110,7 +112,7 @@ function makeChart2TableHTML(chart) {
 	html += "<th>년월</th>";
 	html += "<th>평균평단가</th>";
 	if (chart.ma_data) {
-		html += "<th>평균평단가(6MA)</th>";
+		html += "<th>평균평단가(1YR)</th>";
 	}
 	if (chart.volume_data) {
 		html += "<th>거래건수</th>";
@@ -123,7 +125,7 @@ function makeChart2TableHTML(chart) {
 	if (chart.volume_data) {
 		volume_data = Object.values(chart.volume_data);
 	}
-	if (chart.volume_data) {
+	if (chart.ma_data) {
 		ma_data = Object.values(chart.ma_data);
 	}
 	for(var i = 0; i < data.length; i++) {
@@ -141,14 +143,75 @@ function makeChart2TableHTML(chart) {
 	return html;
 }
 
+function makeRankChart2TableHTML(gubun, data) {
+	var html = "<tr>";
+	switch(gubun) {
+		case 'Region':
+			html += "<th>구</th>";
+			break;
+		case 'Dong':
+			html += "<th>구</th>";
+			html += "<th>동</th>";
+			break;
+		case 'Apt':
+			html += "<th>구</th>";
+			html += "<th>아파트</th>";
+			break;
+	}
+	html += "<th>상승율</th>";
+	html += "<th>"+myChart.base_ym+"의 연간 평단가</th>";
+	html += "<th>"+myChart.years+"년 전의 연간 평단가</th>";
+	html += "</tr>";
+	for(var i = 0; i < data['labels'].length; i++) {
+		html += "<tr>";
+		if (gubun == 'Region') {
+			html += "<td>"+data['labels'][i]+"</td>";
+		} else {
+			var labels = data['labels'][i].split(' ');
+			html += "<td>"+labels[0]+"</td>";
+			html += "<td>"+labels[1]+"</td>";
+		}
+		html += "<td>"+data['data'][i]+"</td>";
+		html += "<td>"+data['price'][i]+"</td>";
+		html += "<td>"+data['before_price'][i]+"</td>";
+		html += "</tr>";
+	}
+	return html;
+}
+
+function getRankURL(gubun, base_ym, years, orderby = 0, page = 1) {
+
+	let url = "{{ config['BASE_URL'] }}";
+
+	url += "getRankBy" + gubun;
+	url += "?base="+base_ym+"&years="+years+"&page="+page+"&orderby="+orderByOptions[orderby][0];
+
+	return url;
+
+}
+
 function excelChart(index) {
 	if (myChart == null || myChart.data.datasets.length <= index || index < 0)
 		return;
 
 	var title = myChart.data.datasets[index].label;
-	var chart = gChartData.get(title);
 
+	var chart = gChartData.get(title);
 	table2excel(title, makeChart2TableHTML(chart) );
+}
+
+function excelRankChart() {
+
+	var title = myChart.data.datasets[0].label;
+
+	url = getRankURL(myChart.gubun, myChart.base_ym, myChart.years, myChart.orderby, -1);
+
+    $('#processLoading').show();
+	$.getJSON(url, function(jsonData){
+		data = JSON.parse(jsonData);
+		table2excel(title, makeRankChart2TableHTML(myChart.gubun, data) );
+    	$('#processLoading').hide();
+	});
 }
 
 function table2excel(title, table) {
@@ -195,6 +258,7 @@ function excelSales(index, apt) {
 
 	var title = myChart.data.datasets[index].label;
 
+    $('#processLoading').show();
 	$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt, function(jsonData){
 		data = JSON.parse(jsonData);
 		var html = "<tr>";
@@ -220,6 +284,7 @@ function excelSales(index, apt) {
 			html += "</tr>";
 		});
 		table2excel(title+'(거래목록)', html);
+    	$('#processLoading').hide();
 	});
 }
 
@@ -248,23 +313,25 @@ function delChart(index) {
 
 }
 
-function setLineThick(index, thick) {
+function setLineThick(index, thick, recursive) {
 	var meta = myChart.getDatasetMeta(index);
 	if (thick) {
 		myChart.data.datasets[index].borderWidth = 2 + meta.controller._cachedDataOpts.borderWidth;
 		myChart.data.datasets[index].oldColor = meta.controller._cachedDataOpts.borderColor;
-		myChart.data.datasets[index].borderColor = 'red';
+		myChart.data.datasets[index].borderColor = myChart.data.datasets[index].thickColor;
 	} else {
 		myChart.data.datasets[index].borderWidth = 
 			(meta.bar ? Chart.defaults.global.elements.rectangle.borderWidth : Chart.defaults.global.elements.line.borderWidth);
 		myChart.data.datasets[index].borderColor = myChart.data.datasets[index].oldColor;
 	}
 
+	if (recursive) return;
+
 	var label = myChart.data.datasets[index].label;
 	// 기본 차트에 이동평균 또는 거래량 차트가 추가되어 있으면
 	for(i = index+1; i < myChart.data.datasets.length; i++) {
 		if (myChart.data.datasets[i].label.startsWith(label)) {
-			setLineThick(i, thick);
+			setLineThick(i, thick, true);
 		}
 	}
 
@@ -297,10 +364,10 @@ function drawLegend(chart) {
 }
 
 
-function createChart(title, labels) {
+function createChart(title, labels, type, func) {
 	var ctx = document.getElementById("myChart").getContext("2d");
 	myChart = new Chart (ctx, {
-		type: 'line',
+		type: type,
 		data: {
 			labels : labels,
 			datasets : []
@@ -312,13 +379,13 @@ function createChart(title, labels) {
 					type: 'linear',
 					position: 'left'
 				}]
-			},
-			legend: false,
-			legendCallback: function(chart) {
-				return drawLegend(chart);
 			}
 		}
 	});
+	if (func) {
+		myChart.options['legend'] = false;
+		myChart.options['legendCallback'] = func;
+	}
 
 	document.getElementById("myChart").onclick = function(evt) {
 		var activePoint = myChart.getElementAtEvent(event);
@@ -468,7 +535,7 @@ function makeRelativeData(base_pos, data) {
 	}
 }
 
-function makeChartDataset(chartType, title, yAxisID, data) {
+function makeChartDataset(chartType, title, yAxisID, data, color, additionalParams) {
 
 	var dataset = {
 		type: chartType,
@@ -479,6 +546,13 @@ function makeChartDataset(chartType, title, yAxisID, data) {
 		data: data,
 		spanGaps: true
 	};
+	if (color)
+		dataset.thickColor = color;
+
+	if (additionalParams)
+		Object.keys(additionalParams).forEach(function(key) { 
+				dataset[key] = additionalParams[key]; 
+			});
 
 	myChart['data']['datasets'].push(dataset);
 }
@@ -497,11 +571,11 @@ function drawChart(title, labels, data, apt, volume_data, ma_data){
 			makeRelativeData(base_pos, ma_data);
 	}
 
-	makeChartDataset('line', title, 'A', data);
+	makeChartDataset('line', title, 'A', data, 'red');
 
 	// 6개월 이동평균으로 그리기
 	if (draw_options['draw_ma'] && ma_data != null) {
-		makeChartDataset('line', title + "(6MA)", 'A', ma_data);
+		makeChartDataset('line', title + "(1YR)", 'A', ma_data, 'blue');
 	}
 
 	// 거래량 같이 그리기
@@ -509,7 +583,7 @@ function drawChart(title, labels, data, apt, volume_data, ma_data){
 		if (myChart['options']['scales']['yAxes'].length == 1)
 			addRightYAxe();
 
-		makeChartDataset('bar', title + "(거래건수)", 'B', volume_data);
+		makeChartDataset('bar', title + "(거래건수)", 'B', volume_data, 'yellow');
 	}
 
 	$('#chartLegend').html(myChart.generateLegend()); 
@@ -529,7 +603,8 @@ function drawNewChart(title, labels, data, apt, volume_data, ma_data){
 
 	// 차트가 없다면 생성한다
 	if (myChart == null) {
-		createChart(title, labels);
+		let func = function(chart) { return drawLegend(chart); };
+		createChart(title, labels, 'line', func);
 	}
 
 	// 기존에 그려진 차트가 있으면
@@ -559,9 +634,11 @@ function drawSaleLineChart(apt, title) {
     return;
   }
 
+  $('#processLoading').show();
   $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data['data'], apt, data['cnt'], data['maData']);
+  	$('#processLoading').hide();
   });
 
 }
@@ -620,10 +697,137 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
     return;
   }
 
+  $('#processLoading').show();
   $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data['data'], null, data['cnt'], data['ma']);
+	$('#processLoading').hide();
   });
+}
+
+const orderByOptions = [ ['rate', '상승율순 조회'], ['price', '기준가격순 조회'] ];
+
+function drawRankLegend(chart) {
+
+	var text = [];
+
+	text.push('<center>');
+	if (chart.hasPrior)
+		text.push("<span><a onclick='drawRankChartPage(false);'>&lt;</a></span>");
+
+	for (i = 0; i <chart.data.datasets.length; i++) { 
+		if (i > 0)
+			text.push("&nbsp;|&nbsp;");
+		text.push('<span class="line" id="legend'+i+'" style="font-size:small;">'); 
+		text.push(chart.data.datasets[i].label+'</span>');
+	}
+	text.push("&nbsp;|&nbsp;");
+	text.push("<button class='chart-btn chart-btn-excel' onclick=\"drawRankChart('"+myChart.gubun+"','"+myChart.base_ym+"', "+myChart.years+", " + ((myChart.orderby + 1) % 2) + ");\">");
+	text.push(orderByOptions[(myChart.orderby + 1) % 2][1] + "</button>");
+	text.push("<button class='chart-btn chart-btn-excel' onclick='excelRankChart();'>엑셀 다운로드</button>");
+	if (chart.hasLater)
+		text.push("<span><a onclick='drawRankChartPage(true);'>&gt;</a></span>");
+
+	text.push('</center>');
+	return text.join("");
+}
+
+function drawRankChartPage(next) {
+
+	var page = myChart.page;
+	if (next)
+		page += 1;
+	else
+		page -= 1;
+	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.orderby, page);
+		
+}
+
+function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
+
+	let title = '';
+	if (base_ym == "") {
+		let today = new Date();   
+		
+		let year = today.getFullYear(); // 년도
+		let month = today.getMonth() + 1;
+		base_ym = year + "" + (month<10?"0"+month:month);
+	}
+
+	let url = getRankURL(gubun, base_ym, years, orderby, page);
+
+	switch(gubun) {
+		case 'Region':
+			title = '구별 평단가 변동율';
+			break;
+		case 'Dong':
+			title = '동별 평단가 변동율';
+			break;
+		case 'Apt':
+			title = '아파트별 평단가 변동율';
+			break;
+	}
+
+	$('#processLoading').show();
+	$.getJSON(url, function(jsonData){
+		data = JSON.parse(jsonData);
+
+		// 팡업 화면을 숨긴다
+		$("#aptSaleDiv").hide();
+
+		clearChart();
+
+		let func = function(chart) { return drawRankLegend(chart); };
+		createChart(title, data['labels'], 'line', func);
+
+		myChart.options.tooltips.callbacks = {
+        	beforeBody: function(tooltipItem, data) {
+				if (tooltipItem.length != 1) return;
+				if (tooltipItem[0].datasetIndex != 1 && tooltipItem[0].datasetIndex != 2) return;
+				dsIndex = tooltipItem[0].datasetIndex % 2 + 1;
+				ds = myChart.data.datasets[dsIndex];
+				body = myChart.data.datasets[tooltipItem[0].datasetIndex].label + ": " + tooltipItem[0].value + " / " + ds.label + ": " + ds.data[tooltipItem[0].index];
+				tooltipItem.pop();
+				return body;
+			}
+		};
+																																							    
+		if (page > 1)
+			myChart.hasPrior = true;
+		if (data['has_more'])
+			myChart.hasLater = true;
+
+		myChart.gubun = gubun;
+		myChart.base_ym = base_ym;
+		myChart.years = years;
+		myChart.page = page;
+		myChart.orderby = orderby;
+
+		makeChartDataset('line', title, 'A', data['data']);
+
+		myChart.options.scales['xAxes'][0]['stacked'] = true;
+		myChart.options.scales['xAxes'][0]['offset'] = true;
+		myChart.options.scales['xAxes'][0]['gridLines'] = { offsetGridLines: true };
+		myChart.options.scales['xAxes'].push({
+	        stacked: true,
+			display: false,
+		    id: "X2",
+		    gridLines: {
+			    offsetGridLines: true
+			},
+	    	offset: true
+      	});
+		addRightYAxe();
+
+		makeChartDataset('bar', base_ym + '의 평단가', 'B', data['price'], null, { backgroundColor : 'rgba(0, 0, 0, 0.2)', barPercentage: 0.9 });
+		makeChartDataset('bar', years + '년 전의 평단가', 'B', data['before_price'], null, { backgroundColor : 'rgba(0, 255, 0, 0.5)', xAxisID: 'X2', barPercentage: 0.5 });
+
+		$('#chartLegend').html(myChart.generateLegend()); 
+		myChart.update();
+		
+		$('#processLoading').hide();
+
+	});
 }
 
 </script>
@@ -647,6 +851,10 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
 <tbody></tbody>
 </table>
 </div>
+<div id='processLoading' align='center' style="position:absolute; display:none; left:30%; top:250px; width:270px; background-color:#218AB5; border:solid 1px #226B8A; font-family:돋움; font-size:10pt; color:#FFFFFF;"> 
+	<br>&nbsp;<b>조회중입니다. 잠시만 기다려 주세요.<br>&nbsp;</b> 
+</div>
+
 <div id="enterRemark" class="floating-list popup" style="width:400px; height:300px;">
 <label><center>의견을 자유롭게 적어주세요</center></label>
 <textarea id=remark style="width:100%;" rows=10></textarea>
@@ -655,4 +863,3 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
 </div>
 
 {% include 'bottom.html' %}
-
