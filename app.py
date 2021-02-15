@@ -62,7 +62,7 @@ SELECT_APT_SALE_AND_MA = """
 	select b.ma_id apt_id, b.ym, a.unit_price price, b.unit_price ma, a.cnt 
 		 from (
 			 select ym, ma_id, round(sum(unit_price * cnt) / sum(cnt), 2) unit_price
-			   from apt_sale_ma 
+			   from apt_sale_ma_new 
 			  where ma_type = '1' and ma_id = :apt_id1 and ma = 12
 			  group by ma_id, ym
 		 ) b 
@@ -202,7 +202,7 @@ def getSaleStat():
 	sql = SELECT_LIST + " from (" + SELECT_INNER_LIST + " from apt_sale_stats_new where 1 = 1 " 
 	sql += "and region='" + region + "' and dong = '" + dong + "'"
 	sql += add_conditions + " group by ym )" 
-	sql += "a, (" + SELECT_INNER_LIST + " from apt_sale_ma where ma_type = '2' and ma = 12 "
+	sql += "a, (" + SELECT_INNER_LIST + " from apt_sale_ma_new where ma_type = '2' and ma = 12 "
 	sql += "and ma_id = concat('" + region + "', '" + dong + "') "
 	sql += add_conditions + " group by ym ) b" 
 
@@ -379,8 +379,8 @@ SELECT_CHANGE_RATE_REGION = """
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
 				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
 				  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate  
-				  from apt_sale_ma a
-				  	 , apt_sale_ma b 
+				  from apt_sale_ma_new a
+				  	 , apt_sale_ma_new b 
 				  where a.ma_type = '2'
 				    and b.ma_type = '2'
 					and a.ma = 12
@@ -408,8 +408,8 @@ SELECT_CHANGE_RATE_DONG = """
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
 				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
 				  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate  
-			   from apt_sale_ma a
-				  , apt_sale_ma b 
+			   from apt_sale_ma_new a
+				  , apt_sale_ma_new b 
 			  where a.ma_type = '2'
 				and b.ma_type = '2'
 				and a.ma = 12
@@ -446,8 +446,8 @@ SELECT_CHANGE_RATE_APT = """
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price                   
 				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
          		  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate                   
-			   from apt_sale_ma a
-         		  , apt_sale_ma b                   
+			   from apt_sale_ma_new a
+         		  , apt_sale_ma_new b                   
 			  where a.ma_type = '1'
 			    and b.ma_type = '1'
 				and a.ma = 12
