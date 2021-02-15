@@ -58,17 +58,21 @@ def spreadDataForYM(rows, ym_label, labels, data_list):
 			mm = mm + 1
 		min_ym = str(yy) + str(mm).zfill(2)
 
-SELECT_APT_SALE_MA = """
-	select ym, unit_price price
-	 from apt_sale_ma s
-	 where apt_id=:apt
-	 order by ym
-"""
-
 SELECT_APT_SALE_AND_MA = """
-	select b.ym, a.unit_price price, b.unit_price ma, a.cnt from (select * from apt_sale_ma where apt_id=:apt_id1 and ma=12) b 
-	 left outer join (select apt_id, ym, round(avg(price/(area/3.3)), 2) unit_price, count(*) cnt from apt_sale_new where apt_id = :apt_id2 group by ym) a
-	 on b.apt_id =a.apt_id and a.ym = b.ym order by b.ym
+	select b.ma_id apt_id, b.ym, a.unit_price price, b.unit_price ma, a.cnt 
+		 from (
+			 select ym, ma_id, round(sum(unit_price * cnt) / sum(cnt), 2) unit_price
+			   from apt_sale_ma 
+			  where ma_type = '1' and ma_id = :apt_id1 and ma = 12
+			  group by ma_id, ym
+		 ) b 
+	 left outer join (
+	 	 select apt_id, ym, round(avg(price/(area/3.3)), 2) unit_price, count(*) cnt 
+		   from apt_sale_new 
+		  where apt_id = :apt_id2 
+		  group by ym
+		 ) a
+	 on b.ma_id =a.apt_id and a.ym = b.ym order by b.ym
 """
 
 SELECT_APT_SALE = """
@@ -156,6 +160,9 @@ def getApt():
  
 	return jsonify(json_return)
 
+SELECT_LIST = "select a.ym, convert(a.unit_price, char) unit_price, convert(a.cnt, unsigned) cnt, convert(b.unit_price, char) unit_price_12ma"
+SELECT_INNER_LIST = "select ym, round(sum(unit_price * cnt)/sum(cnt), 2) unit_price, sum(cnt) cnt"
+
 @app.route("/getSaleStat")
 def getSaleStat():
 	params = request.args.to_dict()
@@ -163,36 +170,43 @@ def getSaleStat():
 	from_ym = params['from_ym']
 	to_ym = params['to_ym']
 	region = params['region']
+	if region == "":
+		region = "11000"
 	dong = params['dong']
+	if dong == "":
+		dong = "00000"
 	area_type = params['area_type']
 	ages = params['ages']
 	age_sign = params['age_sign']
 
-	sql = " select ym, cast(round(avg(unit_price), 0) as signed) unit_price, "
-	sql += " cast(sum(cnt) as signed) cnt, cast(round(avg(unit_price_12ma), 0) as signed) unit_price_12ma"
-	sql += " from("
-	sql += " select * from apt_sale_stats_new where 1 = 1"
+	add_conditions = ""
 	if complex_only != "":
-		sql += " and complex_flag = '" + complex_only + "'"
+		add_conditions += " and complex_flag = '" + complex_only + "'"
 	if from_ym != "":
-		sql += " and ym >= '" + from_ym + "'"
+		add_conditions += " and ym >= '" + from_ym + "'"
 	if to_ym != "":
-		sql += " and ym <= '" + to_ym + "'"
-	if region != "":
-		sql += " and region = '" + region + "'"
-	if dong != "":
-		sql += " and dong = '" + dong + "'"
+		add_conditions += " and ym <= '" + to_ym + "'"
 	if area_type != "":
-		sql += " and ("
+		add_conditions += " and ("
 	pos = 0
 	while (len(area_type) > pos):
 		if (pos > 0):
-			sql += " or "
-			sql += " area_type = '" + area_type[pos:pos+2] + "'"
+			add_conditions += " or "
+			add_conditions += " area_type = '" + area_type[pos:pos+2] + "'"
 		pos = pos + 2
+	if area_type != "":
+		add_conditions += ")"
 	if ages != "" and age_sign != "":
-		sql += " and " + str(date.today().year - int(ages)) + age_sign + " made_year"
-	sql += " ) a  group by ym"
+		add_conditions += " and " + str(date.today().year - int(ages)) + age_sign + " made_year"
+
+	sql = SELECT_LIST + " from (" + SELECT_INNER_LIST + " from apt_sale_stats_new where 1 = 1 " 
+	sql += "and region='" + region + "' and dong = '" + dong + "'"
+	sql += add_conditions + " group by ym )" 
+	sql += "a, (" + SELECT_INNER_LIST + " from apt_sale_ma where ma_type = '2' and ma = 12 "
+	sql += "and ma_id = concat('" + region + "', '" + dong + "') "
+	sql += add_conditions + " group by ym ) b" 
+
+	sql += " where a.ym = b.ym "
 	sql += " order by ym"
 	print(sql)
 	with app.engine.connect() as connection:
@@ -319,7 +333,10 @@ def getSaleStatTotal():
 
 
 PAGE_SIZE = 30
-def getRankCommon(request, sql):
+def getRankCommon(request, sql, addConditions = {}):
+
+	for key, value in addConditions.items():
+		sql = sql + " and " + key + " = '" + value + "'"
 
 	params = request.args.to_dict()
 	base_ym = params['base']
@@ -358,16 +375,20 @@ def getRankCommon(request, sql):
 SELECT_CHANGE_RATE_REGION = """
 	select r.region_name name, a.* 
 		 from (
-		 	 select a.region
-			 	  , round(sum(a.unit_price_12ma * a.cnt_12ma) / sum(a.cnt_12ma), 2) price
-				  , round(sum(b.unit_price_12ma * b.cnt_12ma) / sum(b.cnt_12ma), 2) before_price
-				  , round((sum(a.unit_price_12ma * a.cnt_12ma) / sum(a.cnt_12ma)) / (sum(b.unit_price_12ma * b.cnt_12ma) / sum(b.cnt_12ma)), 2) rate  
-				  from apt_sale_stats_new a
-				  	 , apt_sale_stats_new b 
-				  where a.ym = :base_ym
+		 	 select substr(a.ma_id, 1, 5) region
+			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
+				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
+				  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate  
+				  from apt_sale_ma a
+				  	 , apt_sale_ma b 
+				  where a.ma_type = '2'
+				    and b.ma_type = '2'
+					and a.ma = 12
+					and b.ma = 12
+					and a.ym = :base_ym
 				    and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m') 
-					and a.region = b.region 
-				  group by a.region
+					and substr(a.ma_id, 1, 5) = substr(b.ma_id, 1, 5)
+				  group by substr(a.ma_id, 1, 5)
 			) a, ref_region r 
 		  where a.region = r.region_cd
 """
@@ -383,27 +404,37 @@ def getRankByRegion():
 SELECT_CHANGE_RATE_DONG = """
 	select concat(r.region_name, ' ', d.dong_name) name, a.*          
 		 from (              
-		 	 select a.region, a.dong    
-			 	  , round(sum(a.unit_price_12ma * a.cnt_12ma) / sum(a.cnt_12ma), 2) price
-             	  , round(sum(b.unit_price_12ma * b.cnt_12ma) / sum(b.cnt_12ma), 2) before_price                   
-				  , round((sum(a.unit_price_12ma * a.cnt_12ma) / sum(a.cnt_12ma)) / (sum(b.unit_price_12ma * b.cnt_12ma) / sum(b.cnt_12ma)), 2) rate
-			   from apt_sale_stats_new a                      
-			      , apt_sale_stats_new b                   
-			  where a.ym = :base_ym                   
+		 	 select substr(a.ma_id, 1, 5) region, substr(a.ma_id, 6, 5) dong   
+			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
+				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
+				  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate  
+			   from apt_sale_ma a
+				  , apt_sale_ma b 
+			  where a.ma_type = '2'
+				and b.ma_type = '2'
+				and a.ma = 12
+				and b.ma = 12
+			    and a.ym = :base_ym                   
 			 	and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')                     
-				and a.region = b.region  and a.dong = b.dong                 
-		   group by a.region, a.dong
+				and a.ma_id = b.ma_id
+		      group by a.ma_id
 		  ) a, ref_region r, apt_dong d           
 		 where a.region = r.region_cd 
 		   and a.region = d.region_cd 
 		   and a.dong = d.dong_cd           
 """
 
-
-
 @app.route("/getRankByDong")
 def getRankByDong():
-	json_return = getRankCommon(request, SELECT_CHANGE_RATE_DONG)
+
+	addConditions = {}
+
+	params = request.args.to_dict()
+	if params.__contains__('region'):
+		region = params['region']
+		addConditions['a.region'] = region
+
+	json_return = getRankCommon(request, SELECT_CHANGE_RATE_DONG, addConditions)
 
 	return jsonify(json_return)
 
@@ -411,16 +442,20 @@ def getRankByDong():
 SELECT_CHANGE_RATE_APT = """
 	select concat(d.dong_name, ' ', m.apt_name) name, a.*          
 		 from (              
-		 	 select a.apt_id       
+		 	 select a.ma_id apt_id       
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price                   
 				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
          		  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate                   
 			   from apt_sale_ma a
          		  , apt_sale_ma b                   
-			  where a.ym = :base_ym              
+			  where a.ma_type = '1'
+			    and b.ma_type = '1'
+				and a.ma = 12
+				and b.ma = 12
+				and a.ym = :base_ym              
 			    and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
-		        and a.apt_id = b.apt_id          
-			  group by a.apt_id         
+		        and a.ma_id = b.ma_id          
+			  group by a.ma_id         
 		 ) a, apt_master_new m, apt_dong d       
 	 where a.apt_id = m.id  
 	   and m.region = d.region_cd
@@ -429,8 +464,17 @@ SELECT_CHANGE_RATE_APT = """
 
 @app.route("/getRankByApt")
 def getRankByApt():
+
+	addConditions = {}
+
+	params = request.args.to_dict()
+	if params.__contains__('region'):
+		addConditions['m.region'] = params['region']
+	if params.__contains__('dong'):
+		addConditions['m.dong'] = params['dong']
+
 	
-	json_return = getRankCommon(request, SELECT_CHANGE_RATE_APT)
+	json_return = getRankCommon(request, SELECT_CHANGE_RATE_APT, addConditions)
 
 	return jsonify(json_return)
 

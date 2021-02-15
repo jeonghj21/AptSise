@@ -37,13 +37,6 @@ function setPopupPosition(event, popup) {
 	    return popupPosition; 
 } 
 
-function enterRemark() {
-  var div = $("#enterRemark");
-  var y = ($(window).height() - div.outerHeight() ) / 2;
-  var x = ($(window).width() - div.outerWidth() ) / 2;
-  div.css({top: y+'px', left: x+'px', display: 'block'});
-}
-
 function showAptSaleTable(event, data) {
   $('#aptSaleTable > tbody:last').empty();
   $.each(data, function(idx, r) {
@@ -179,12 +172,17 @@ function makeRankChart2TableHTML(gubun, data) {
 	return html;
 }
 
-function getRankURL(gubun, base_ym, years, orderby = 0, page = 1) {
+function getRankURL(gubun, base_ym, years, region, dong, orderby = 0, page = 1) {
 
 	let url = "{{ config['BASE_URL'] }}";
 
 	url += "getRankBy" + gubun;
 	url += "?base="+base_ym+"&years="+years+"&page="+page+"&orderby="+orderByOptions[orderby][0];
+
+	if (region != '11000')
+		url += "&region=" + region;
+	if (dong != '00000')
+		url += "&dong=" + dong;
 
 	return url;
 
@@ -206,11 +204,13 @@ function excelRankChart() {
 
 	url = getRankURL(myChart.gubun, myChart.base_ym, myChart.years, myChart.orderby, -1);
 
-    $('#processLoading').show();
+    // $('#processLoading').show();
+	showMessage();
 	$.getJSON(url, function(jsonData){
 		data = JSON.parse(jsonData);
 		table2excel(title, makeRankChart2TableHTML(myChart.gubun, data) );
-    	$('#processLoading').hide();
+    	// $('#processLoading').hide();
+		closeMessage();
 	});
 }
 
@@ -258,7 +258,8 @@ function excelSales(index, apt) {
 
 	var title = myChart.data.datasets[index].label;
 
-    $('#processLoading').show();
+    //$('#processLoading').show();
+	showMessage();
 	$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt, function(jsonData){
 		data = JSON.parse(jsonData);
 		var html = "<tr>";
@@ -284,7 +285,8 @@ function excelSales(index, apt) {
 			html += "</tr>";
 		});
 		table2excel(title+'(거래목록)', html);
-    	$('#processLoading').hide();
+    	//$('#processLoading').hide();
+		closeMessage();
 	});
 }
 
@@ -593,6 +595,7 @@ function drawChart(title, labels, data, apt, volume_data, ma_data){
 }
 
 function drawNewChart(title, labels, data, apt, volume_data, ma_data){
+	$("#draw_options > input:checkbox").attr("disabled",false);
 	// 팡업 화면을 숨긴다
 	$("#aptSaleDiv").hide();
 
@@ -629,16 +632,27 @@ function drawNewChart(title, labels, data, apt, volume_data, ma_data){
 
 function drawSaleLineChart(apt, title) {
 
+	if (apt == undefined || apt == "") {
+		alert('아파트가 선택도지 않았습니다.');
+		return;
+	}
+	if (title == undefined || title == "") {
+		alert('아파트가 선택도지 않았습니다.');
+		return;
+	}
+
   if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
 
-  $('#processLoading').show();
+  //$('#processLoading').show();
+  showMessage();
   $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data['data'], apt, data['cnt'], data['maData']);
-  	$('#processLoading').hide();
+  	//$('#processLoading').hide();
+	closeMessage();
   });
 
 }
@@ -697,11 +711,13 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
     return;
   }
 
-  $('#processLoading').show();
+  //$('#processLoading').show();
+  showMessage();
   $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data['data'], null, data['cnt'], data['ma']);
-	$('#processLoading').hide();
+	//$('#processLoading').hide();
+	closeMessage();
   });
 }
 
@@ -713,23 +729,30 @@ function drawRankLegend(chart) {
 
 	text.push('<center>');
 	if (chart.hasPrior)
-		text.push("<span><a onclick='drawRankChartPage(false);'>&lt;</a></span>");
+		text.push("<span><a onclick='drawRankChartPage(false);'>◀&nbsp;&nbsp;</a></span>");
 
 	for (i = 0; i <chart.data.datasets.length; i++) { 
 		if (i > 0)
 			text.push("&nbsp;|&nbsp;");
-		text.push('<span class="line" id="legend'+i+'" style="font-size:small;">'); 
-		text.push(chart.data.datasets[i].label+'</span>');
+		var color = chart.data.datasets[i].backgroundColor ? chart.data.datasets[i].backgroundColor : chart.options.defaultColor;
+		text.push('<span style="background-color: ' + color + ';">&nbsp;&nbsp;&nbsp;&nbsp;</span>'); 
+		text.push('<span style="font-size:small;">' +chart.data.datasets[i].label + '</span>');
 	}
 	text.push("&nbsp;|&nbsp;");
-	text.push("<button class='chart-btn chart-btn-excel' onclick=\"drawRankChart('"+myChart.gubun+"','"+myChart.base_ym+"', "+myChart.years+", " + ((myChart.orderby + 1) % 2) + ");\">");
+	text.push("<button class='chart-btn chart-btn-excel' onclick=\"redrawRankChart(" + ((myChart.orderby + 1) % 2) + ");\">");
 	text.push(orderByOptions[(myChart.orderby + 1) % 2][1] + "</button>");
 	text.push("<button class='chart-btn chart-btn-excel' onclick='excelRankChart();'>엑셀 다운로드</button>");
 	if (chart.hasLater)
-		text.push("<span><a onclick='drawRankChartPage(true);'>&gt;</a></span>");
+		text.push("<span><a onclick='drawRankChartPage(true);'>&nbsp;&nbsp;▶</a></span>");
 
 	text.push('</center>');
 	return text.join("");
+}
+
+function redrawRankChart(orderby) {
+	
+	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, orderby);
+
 }
 
 function drawRankChartPage(next) {
@@ -739,12 +762,13 @@ function drawRankChartPage(next) {
 		page += 1;
 	else
 		page -= 1;
-	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.orderby, page);
+	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, myChart.orderby, page);
 		
 }
 
-function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
-
+function drawRankChart(gubun, base_ym, years, region, dong, orderby = 0, page = 1) {
+	
+	$("#draw_options > input:checkbox").attr("disabled",true);
 	let title = '';
 	if (base_ym == "") {
 		let today = new Date();   
@@ -754,7 +778,7 @@ function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
 		base_ym = year + "" + (month<10?"0"+month:month);
 	}
 
-	let url = getRankURL(gubun, base_ym, years, orderby, page);
+	let url = getRankURL(gubun, base_ym, years, region, dong, orderby, page);
 
 	switch(gubun) {
 		case 'Region':
@@ -768,7 +792,8 @@ function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
 			break;
 	}
 
-	$('#processLoading').show();
+	//$('#processLoading').show();
+	showMessage();
 	$.getJSON(url, function(jsonData){
 		data = JSON.parse(jsonData);
 
@@ -802,6 +827,8 @@ function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
 		myChart.years = years;
 		myChart.page = page;
 		myChart.orderby = orderby;
+		myChart.region = region;
+		myChart.dong = dong;
 
 		makeChartDataset('line', title, 'A', data['data']);
 
@@ -819,18 +846,20 @@ function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
       	});
 		addRightYAxe();
 
-		makeChartDataset('bar', base_ym + '의 평단가', 'B', data['price'], null, { backgroundColor : 'rgba(0, 0, 0, 0.2)', barPercentage: 0.9 });
-		makeChartDataset('bar', years + '년 전의 평단가', 'B', data['before_price'], null, { backgroundColor : 'rgba(0, 255, 0, 0.5)', xAxisID: 'X2', barPercentage: 0.5 });
+		makeChartDataset('bar', base_ym + '의 평단가', 'B', data['price'], null, { backgroundColor : 'rgba(0, 255, 0, 0.5)', barPercentage: 0.9 });
+		makeChartDataset('bar', years + '년 전의 평단가', 'B', data['before_price'], null, { backgroundColor : 'rgba(255, 0, 0, 1)', xAxisID: 'X2', barPercentage: 0.5 });
 
 		$('#chartLegend').html(myChart.generateLegend()); 
 		myChart.update();
 		
-		$('#processLoading').hide();
+		//$('#processLoading').hide();
+		closeMessage();
 
 	});
 }
 
 </script>
+
 
 {% include 'container.html' %}
 <div style='width:100%; margin:20px;'>
@@ -850,16 +879,6 @@ function drawRankChart(gubun, base_ym, years, orderby = 0, page = 1) {
 </thead>
 <tbody></tbody>
 </table>
-</div>
-<div id='processLoading' align='center' style="position:absolute; display:none; left:30%; top:250px; width:270px; background-color:#218AB5; border:solid 1px #226B8A; font-family:돋움; font-size:10pt; color:#FFFFFF;"> 
-	<br>&nbsp;<b>조회중입니다. 잠시만 기다려 주세요.<br>&nbsp;</b> 
-</div>
-
-<div id="enterRemark" class="floating-list popup" style="width:400px; height:300px;">
-<label><center>의견을 자유롭게 적어주세요</center></label>
-<textarea id=remark style="width:100%;" rows=10></textarea>
-<button onclick="sendRemark();">보내기</button>
-<button onclick="$('enterRemark').hide();">취소</button>
 </div>
 
 {% include 'bottom.html' %}

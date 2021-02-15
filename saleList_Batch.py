@@ -109,7 +109,7 @@ def remove_control_chars(s):
 err_seq = 0
 
 def execute_dml(job_key, sql, params = None, job_log = True):
-	sql = remove_control_chars(sql)
+	sql = remove_control_chars(sql.replace('\t', ' '))
 	msg = sql[:30]
 	msg = msg[:msg.rfind(' ')] if msg.rfind(' ') > 20 else msg
 	logger.info(msg + " Starting...")
@@ -147,17 +147,18 @@ def job_fail(job_key):
 
 LOAD_INTO_TMP_RAW_DATA = """
 	LOAD DATA INFILE %s INTO TABLE tmp_raw_data FIELDS TERMINATED BY ',' optionally enclosed by '\"' LINES TERMINATED BY '\\n' IGNORE 1 ROWS
-	 (거래금액,건축년도,년,도로명,도로명건물본번호코드,도로명건물부번호코드,도로명시군구코드,
-	 도로명일련번호코드,도로명지상지하코드,도로명코드,법정동,법정동본번코드,법정동부번코드,
-	 법정동시군구코드,법정동읍면동코드,법정동지번코드,아파트,월,일,일련번호,전용면적,지번, 지역코드, 층, job_key, @vapt_id, ym)
-	 set apt_id = nullif(@vapt_id, '')
+		(거래금액,건축년도,년,도로명,도로명건물본번호코드,도로명건물부번호코드,도로명시군구코드,
+		도로명일련번호코드,도로명지상지하코드,도로명코드,법정동,법정동본번코드,법정동부번코드,
+		법정동시군구코드,법정동읍면동코드,법정동지번코드,아파트,월,일,일련번호,전용면적,지번, 지역코드, 층, job_key, @vapt_id, ym)
+		set apt_id = nullif(@vapt_id, '')
 """
 
 INSERT_TMP_RAW_DATA2 = """
-	insert into tmp_raw_data2 select * from tmp_raw_data 
-	 where (아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번) 
-	 not in (select 아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번
-	 from raw_data where ym = %s)
+	insert into tmp_raw_data2 
+		select * from tmp_raw_data 
+	 	 where (아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번) 
+	 	   not in (select 아파트,건축년도,년,월,일,거래금액,전용면적, 층, 일련번호,법정동시군구코드,법정동읍면동코드,도로명코드,지번
+	 	  from raw_data where ym = %s)
 """
 
 def get_and_load_data(job_key, ym, regions, columns):
@@ -233,25 +234,32 @@ INSERT_JOB_LOG = "insert into job_log values(%s, %s, %s, str_to_date(%s, '%Y%m%d
 
 INSERT_APT_MASTER_NEW = """
 	insert into apt_master_new 
-	 select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도,'' from tmp_raw_data2
-	 where (건축년도,법정동시군구코드,아파트)
-	 not  in (select made_year, region, apt_name from apt_master_new)
-	 group by 건축년도, 도로명코드,법정동시군구코드,법정동읍면동코드,아파트 
+		select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도,'' 
+		  from tmp_raw_data2
+	 	 where (건축년도,법정동시군구코드,아파트)
+	 	   not in (select made_year, region, apt_name from apt_master_new)
+	 	 group by 건축년도, 도로명코드,법정동시군구코드,법정동읍면동코드,아파트 
 """
 
 UPDATE_TMP_RAW_DATA2 = """
-	update tmp_raw_data2 a set apt_id = 
-	 (select id from apt_master_new where made_year = a.건축년도 and road_cd=a.도로명코드 
-	 and region=a.법정동시군구코드 and dong=a.법정동읍면동코드 and apt_name=a.아파트)
+	update tmp_raw_data2 a set apt_id = (
+		select id 
+		  from apt_master_new 
+		 where made_year = a.건축년도 
+		   and road_cd = a.도로명코드 
+	 	   and region = a.법정동시군구코드 
+		   and dong = a.법정동읍면동코드 
+		   and apt_name = a.아파트
+		)
 """
 
 INSERT_APT_SALE_NEW = """
 	insert into apt_sale_new
-	 select null, cast(replace(거래금액, ',', '') as signed integer),
-	 STR_TO_DATE(concat(cast(년 as char), lpad(cast(월 as char), 2, '0'), lpad(cast(일 as char),2,'0')), '%Y%m%d'),
-	 전용면적, case when 전용면적<=60 then '01' when 전용면적>60 and 전용면적<=85 then '02' when 전용면적>85 and 전용면적<=135 then '03' when 전용면적>135 then '04' end,
-	 cast(층 as signed integer), 일련번호, apt_id, concat(cast(년 as char), lpad(cast(월 as char), 2, '0')) 
-	 from tmp_raw_data2
+		select null, cast(replace(거래금액, ',', '') as signed integer),
+	 		   STR_TO_DATE(concat(cast(년 as char), lpad(cast(월 as char), 2, '0'), lpad(cast(일 as char),2,'0')), '%Y%m%d'),
+	 		   전용면적, case when 전용면적<=60 then '01' when 전용면적>60 and 전용면적<=85 then '02' when 전용면적>85 and 전용면적<=135 then '03' when 전용면적>135 then '04' end,
+	 		   cast(층 as signed integer), 일련번호, apt_id, concat(cast(년 as char), lpad(cast(월 as char), 2, '0')) 
+	 	  from tmp_raw_data2
 """
 
 INSERT_RAW_DATA = "insert into raw_data select * from tmp_raw_data2"
@@ -260,114 +268,106 @@ DELETE_APT_SALE_NEW = "delete from apt_sale_new where id in (select id from apt_
 
 INSERT_APT_SALE_DELETED = """
 	insert into apt_sale_deleted
-	 select a.*, %s from apt_sale_new a, apt_master_new b
-	 where a.apt_id = b.id and ym = %s
-	 and (format(price,0), date_format(saled, '%Y%m%d'), area, floor, region, dong,  road_cd, apt_name, seq)
-	 not in (select 거래금액, concat(년,lpad(월, 2, '0'), lpad(일, 2, '0')), 전용면적, cast(층 as signed integer),
-	 법정동시군구코드, 법정동읍면동코드, 도로명코드, 아파트, 일련번호 from raw_data where ym=%s)
+		select a.*, %s 
+		  from apt_sale_new a, apt_master_new b
+	 	 where a.apt_id = b.id 
+		   and ym = %s
+	 	   and (format(price,0), date_format(saled, '%Y%m%d'), area, floor, region, dong,  road_cd, apt_name, seq)
+	 	   not in (
+		   		select 거래금액, concat(년,lpad(월, 2, '0'), lpad(일, 2, '0')), 전용면적, cast(층 as signed integer),
+	 				   법정동시군구코드, 법정동읍면동코드, 도로명코드, 아파트, 일련번호 
+				  from raw_data 
+				 where ym = %s
+			   )
 """
 
-DELETE_APT_SALE_MA = """
-	delete from apt_sale_ma 
-		 where apt_id in (
-			 select distinct apt_id from (
-				 select apt_id from apt_sale_deleted 
-				 union 
-				 select apt_id from tmp_raw_data2
-			) a
-		 )
-"""
+DELETE_APT_SALE_MA = "delete from apt_sale_ma_new where ym = %s"
 
 INSERT_APT_SALE_MA = """
-	insert into apt_sale_ma
-		 select a.apt_id, a.ym, 12, avg(price/(area/3.3)), count(*)
-			 from (
-				 select apt_id, ym 
-					 from apt_sale_new 
-					 where apt_id in (
-		                select distinct apt_id from (
-							 select apt_id from apt_sale_deleted
-                		 	 union
-    						 select apt_id from tmp_raw_data2
-						) a
-					 ) 
-				 group by apt_id, ym
-			 ) a, apt_sale_new b
-			  where a.apt_id = b.apt_id
-					 and b.ym between date_format(date_sub(str_to_date(concat(a.ym,'01'), '%Y%m%d'),interval 11 month), '%Y%m') and a.ym
-			 group by a.ym, a.apt_id
+	insert into apt_sale_ma_new
+		select * from (
+			select '1', a.apt_id ma_id, b.ym, 12, c.made_year, a.area_type, round(avg(a.price), 2) ma, count(*) cnt, if(c.k_apt_id is null, 'N', 'Y')
+			  from tmp_ym b
+				 , apt_sale_new a
+				 , apt_master_new c
+			 where b.ym = %s
+			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+			   and a.apt_id = c.id
+			 group by b.ym, a.apt_id, c.made_year, a.area_type, c.k_apt_id
+		) a
+		 where ma_id is not null
+"""
+
+INSERT_APT_STATS_MA = """
+	insert into apt_sale_ma_new
+		select * 
+		  from (
+    		select '2', concat(a.region, a.dong) ma_id, b.ym, 12, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) ma, sum(a.cnt) cnt, a.complex_flag
+	      	  from tmp_ym b, apt_sale_stats_new a
+		 	 where b.ym = %s
+		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+		 	 group by b.ym, a.region, a.dong, a.complex_flag, a.made_year, a.area_type
+		  ) a
+		 where ma_id is not null
+"""
+
+INSERT_APT_STATS_MA_REGION = """
+	insert into apt_sale_ma_new
+		select * 
+		  from (
+    		select '2', concat(a.region, '00000') ma_id, b.ym, 12, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) ma, sum(a.cnt) cnt, a.complex_flag
+	      	  from tmp_ym b, apt_sale_stats_new a
+		 	 where b.ym = %s
+			   and region != '11000'
+		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+		 	 group by b.ym, a.region, a.complex_flag, a.made_year, a.area_type
+		  ) a
+		 where ma_id is not null
 """
 
 DELETE_APT_SALE_STATS_NEW = "delete from apt_sale_stats_new where ym = %s"
 
 INSERT_APT_SALE_STATS_NEW = """
 	insert into apt_sale_stats_new
-	 select region, dong, made_year, area_type, ym, avg(price/(area/3.3)), 0, count(*), 'N', NULL, NULL
-	 from apt_sale_new a, apt_master_new b
-	 where a.apt_id = b.id and a.ym = %s
-	 group by region, dong, made_year, area_type, ym
-"""
-
-INSERT_APT_SALE_STATS_NEW_TOTAL = """
-	insert into apt_sale_stats_new
-	 select '11000', '00000', made_year, area_type, ym, avg(price/(area/3.3)), 0, count(*), 'N', NULL, NULL
-	 from apt_sale_new a, apt_master_new b
-	 where a.apt_id = b.id and a.ym = %s
-	 group by made_year, area_type, ym
+		select region, dong, made_year, area_type, ym, avg(price/(area/3.3)), count(*), 'N'
+	 	  from apt_sale_new a, apt_master_new b
+	 	 where a.apt_id = b.id and a.ym = %s
+	 	 group by region, dong, made_year, area_type, ym
 """
 
 INSERT_APT_SALE_STATS_NEW_Y = """
 	insert into apt_sale_stats_new
-	 select region, dong, made_year, area_type, ym, avg(price/(area/3.3)), 0, count(*), 'Y', NULL, NULL
-	 from apt_sale_new a, apt_master_new b
-	 where a.apt_id = b.id and a.ym = %s and b.k_apt_id is not null
-	 group by region, dong, made_year, area_type, ym
+		select region, dong, made_year, area_type, ym, avg(price/(area/3.3)), count(*), 'Y'
+	 	  from apt_sale_new a, apt_master_new b
+	 	 where a.apt_id = b.id and a.ym = %s and b.k_apt_id is not null
+	 	 group by region, dong, made_year, area_type, ym
 """
 
-INSERT_APT_SALE_STATS_NEW_TOTAL_Y = """
+INSERT_APT_SALE_STATS_NEW_REGION = """
 	insert into apt_sale_stats_new
-	 select '11000', '00000', made_year, area_type, ym, avg(price/(area/3.3)), 0, count(*), 'Y', NULL, NULL
-	 from apt_sale_new a, apt_master_new b
-	 where a.apt_id = b.id and a.ym = %s and b.k_apt_id is not null
-	 group by made_year, area_type, ym
+		select region, '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), complex_flag
+	 	  from apt_sale_stats_new a
+	 	 where a.ym = %s
+	 	 group by region, made_year, area_type, ym, complex_flag
 """
 
-INSERT_TMP_MA = """
-insert into tmp_ma
-	 select b.ym, a.region, a.dong, a.made_year, a.area_type, a.complex_flag,
-			round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) ma, sum(a.cnt) cnt, min(a.ym) ym_from, max(a.ym) ym_to
-		 from tmp_ym b, apt_sale_stats_new a
-		 where b.ym = %s
-		 	and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
-		 group by b.ym, a.region, a.dong, a.made_year, a.area_type, a.complex_flag
-"""
-
-UPDATE_APT_SALE_STATS_MA = """
-update apt_sale_stats_new a set
-	 unit_price_12ma = (
-		 select ma from tmp_ma b
-			 where b.ym = a.ym
-				 and b.region = a.region
-				 and b.dong = a.dong
-				 and b.complex_flag = a.complex_flag
-				 and b.made_year = a.made_year
-				 and b.area_type = a.area_type
-	),
-	 cnt_12ma = (
-		 select cnt from tmp_ma b
-			 where b.ym = a.ym
-				 and b.region = a.region
-				 and b.dong = a.dong
-				 and b.complex_flag = a.complex_flag
-				 and b.made_year = a.made_year
-				 and b.area_type = a.area_type
-	)
-	 where ym = %s
+INSERT_APT_SALE_STATS_NEW_TOTAL = """
+	insert into apt_sale_stats_new
+		select '11000', '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), complex_flag
+	 	  from apt_sale_stats_new a
+	 	 where a.ym = %s
+		   and dong = '00000'
+	 	 group by made_year, area_type, ym, complex_flag
 """
 
 UPDATE_JOB_LOG_SUCCESS = """
-	update job_log set end_dt = str_to_date(%s, '%Y%m%d%H%i%S'), result='Y',
-	 get_cnt = %s, insert_cnt = %s, delete_cnt = %s, new_apt_cnt = %s
+	update job_log set 
+		end_dt = str_to_date(%s, '%Y%m%d%H%i%S')
+	  , result='Y'
+	  , get_cnt = %s
+	  , insert_cnt = %s
+	  , delete_cnt = %s
+	  , new_apt_cnt = %s
 	 where job_key = %s
 """
 
@@ -375,6 +375,9 @@ for ym in YMs:
 	job_key = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
 	logger.info(ym + " : starting...")
 	execute_dml(job_key, INSERT_JOB_LOG, (JOB_NAME, job_key, ym, job_key), "insert into job_log")
+
+	execute_dml(job_key,"delete from tmp_ym where ym='"+ym+"'")
+	execute_dml(job_key,"insert into tmp_ym values('"+ym+"')")
 
 	if execute_dml(job_key, "truncate tmp_raw_data") < 0 \
 	or execute_dml(job_key, "truncate tmp_raw_data2") < 0:
@@ -420,45 +423,30 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_TOTAL, (ym,))
-	if rows < 0:
-		job_fail(job_key)
-
 	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_Y, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_TOTAL_Y, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_TOTAL, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
-	if execute_dml(job_key, "truncate tmp_ma") < 0: 
-		job_fail(job_key)
-
-	rows = execute_dml(job_key, INSERT_TMP_MA, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_REGION, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, UPDATE_APT_SALE_STATS_MA, (ym,))
+	rows = execute_dml(job_key, DELETE_APT_SALE_MA, (ym,))
+	if rows < 0:
+		job_fail(job_key)
+
+	rows = execute_dml(job_key, INSERT_APT_SALE_MA, (ym,))
+	if rows < 0:
+		job_fail(job_key)
+
+	rows = execute_dml(job_key, INSERT_APT_STATS_MA, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
 	execute_dml(job_key, UPDATE_JOB_LOG_SUCCESS, (datetime.datetime.now().strftime('%Y%m%d%H%M%S'), get_cnt, ins_cnt, del_cnt, apt_cnt, job_key))
-
-
-job_key = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-execute_dml(job_key, INSERT_JOB_LOG, (JOB_NAME, job_key, '', job_key), "insert into job_log")
-
-rows = execute_dml(job_key, DELETE_APT_SALE_MA, ())
-if rows < 0:
-	job_fail(job_key)
-del_cnt = rows
-
-rows = execute_dml(job_key, INSERT_APT_SALE_MA, ())
-if rows < 0:
-	job_fail(job_key)
-ins_cnt = rows
-
-execute_dml(job_key, UPDATE_JOB_LOG_SUCCESS, (datetime.datetime.now().strftime('%Y%m%d%H%M%S'), 0, ins_cnt, del_cnt, 0, job_key))
 
 logger.info("Completed!!")

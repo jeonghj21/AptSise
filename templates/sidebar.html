@@ -83,12 +83,11 @@ function requestSaleStat() {
 		area_type = "";
 
 	var region = $('select#region').val();
-	var title, dong;
+	var dong = $('select#dong').val();
+	var title;
 	if ($("select#dong")[0].selectedIndex <= 0) {
-		dong = "";
 		title = $('select#region option:checked').text();
 	} else {
-		dong = $('select#dong').val();
 		title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
 	}
 
@@ -123,34 +122,37 @@ function toggleYMTable(btn, target, desc) {
 	}
 }
 
-$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
-	list = JSON.parse(data);
-	regions = list[0];
-	dongs = list[1];
-	initRegions();
-});
+function wrapWindowByMask() { 
+	//화면의 높이와 너비를 구한다. 
+	var maskHeight = $(document).height(); 
+	var maskWidth = $(window).width(); 
+	
+	//마스크의 높이와 너비를 화면 것으로 만들어 전체 화면을 채운다. 
+	$('#fade').css({ 'width': maskWidth, 'height': maskHeight }); 
+} 
+	
+/// 화면의 중앙에 레이어띄움 
+function showMessage() { 
+	wrapWindowByMask(); 
+	$("#light").css("position", "absolute"); 
+	$("#light").css("top", Math.max(0, (($(window).height() - $("#light").outerHeight()) / 2) + $(window).scrollTop() - 100) + "px"); 
+	$("#light").css("left", Math.max(0, (($(window).width() - $("#light").outerWidth()) / 2) + $(window).scrollLeft()) + "px"); 
+	$('#fade').show(); 
+	$('#light').show(); 
+} 
+
+function closeMessage() { 
+	$('#fade').hide(); 
+	$('#light').hide(); 
+}
 
 </script>
 <div class="sidebar" style="width:200px; margin-left:5px;">
 	<div class="my-box">
-	<label>조회기간:</label><br>
-		<span style="font-size:small;">디폴트는 2006.01 ~ 현재 월</span><br>
-		<input id=from_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym', false);">▼</a> ~ 
-		<input id=to_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym', true); return false;">▼</a><br>
-	</div>
-	<div class="my-box">
-		<label><strong>지역/아파트 선택</strong></label><br>
-		<label>구 : </label>
-			<select onchange="refreshDong(this.value);" name="region" id="region" style="width:100%;">
-				<option value="11000">all</option>
-			</select><br>
-		<label>동 : </label>
-		<br>
-			<select onchange="refreshApt();" name="dong" id="dong" style="width:100%;">
-				<option value="00000">구 전체</option>
-			</select><br>
-		<center><button id='region_btn' onclick="requestSaleStat();">평균평단가 조회</button></center>
-		<span class="bar-item"><strong>조건 선택</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a><br>
+	<label><strong>조회기간</strong></label><br>
+		<input id=from_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym', false);">▼</a> ~ 
+		<input id=to_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym', true); return false;">▼</a><br>
+		<span class="bar-item"><strong>추가 조건</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a><br>
 		<div id=toggle_term style="display:none;">
 			<label>연식:</label>
 				<select id=ages>
@@ -169,31 +171,66 @@ $.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 				<input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
 				<input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
 		</div>
-		<label>아파트 : </label>&nbsp;&nbsp;
-			<input type=checkbox id=complex onchange="refreshApt();">단지만</input><br>
-			<select onchange="if (this.selectedIndex == 0) return false; drawSaleLineChart(this.value, this.options[this.selectedIndex].text);" name="apt" id="apt" style="width:100%;">
-			</select>
 	</div>
-	<br>
 	<div class="my-box">
+		<label><strong>평균평단가 추이</strong></label><br>
+		<table>
+			<tr>
+				<td>구 선택</td><td>동 선택</td>
+			</tr>	
+			<tr>
+				<td>
+					<select onchange="refreshDong(this.value);" name="region" id="region" style="width:100%;">
+						<option value="11000">서울 전체</option>
+					</select>
+				</td>
+				<td>
+					<select onchange="refreshApt();" name="dong" id="dong" style="width:100%;">
+						<option value="00000">구 전체</option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<td colspan = 2>
+					<button id='region_btn' onclick="requestSaleStat();">구/동별 평균평단가 추이</button>
+				</td>
+			</tr>
+			<tr>
+				<td>아파트별</td>
+				<td style="font-size: small; padding-left: 0px; padding-right: 0px;">
+					<input type=checkbox id=complex onchange="refreshApt();" />단지만 보기
+				</td>
+			</tr>
+			<tr>
+				<td colspan = 2>
+					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == 'All');"></select>
+				</td>
+			</tr>
+			<tr>
+				<td colspan = 2>
+					<button id='apt_btn' onclick="drawSaleLineChart($('select#apt option:selected').val(), $('select#apt option:selected').text());" disabled>아파트별 평균평단가 추이</button>
+				</td>
+			</tr>
+		</table>
+	</div>
+	<div id="draw_options" class="my-box">
 		<label><strong>차트 옵션</strong></label><br>
 			<input id=draw_overlap type=checkbox onchange="setDrawOption(this);">겹쳐 그리기</input><br>
 			<input id=draw_relative type=checkbox onchange="setDrawOption(this); updateChart();">상대수치로 보기</input><br>
 			<input id=draw_ma type=checkbox onchange="setDrawOption(this); updateChart();">연간 이동평균 같이 보기</input><br>
 			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
 	</div>
-	<br>
 	<div class="my-box">
-		<label><strong>연간 평단가 순위 조회</strong></label><br>
-			<input id=base_ym readOnly style="width:50px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS 
+		<label><strong>연간 평균평단가 비교</strong></label><br>
+			<input id=base_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS 
 				<select id=years>
 					{%for i in range(1, 20)%} 
 					<option value={{i}}>{{i}}</option>
 					{%endfor%} 
 				</select>년전<br>
-			<button onclick="drawRankChart('Region', $('#base_ym').val(), $('#years option:selected').val());">구별 순위</button><br>
-			<button onclick="drawRankChart('Dong', $('#base_ym').val(), $('#years option:selected').val());">동별 순위</button><br>
-			<button onclick="drawRankChart('Apt', $('#base_ym').val(), $('#years option:selected').val());">아파트별 순위</button><br>
+			<button onclick="drawRankChart('Region', $('#base_ym').val(), $('#years option:selected').val(), '11000', '00000');">구별 순위</button><br>
+			<button onclick="drawRankChart('Dong', $('#base_ym').val(), $('#years option:selected').val(), $('#region').val(), '00000');">동별(위에서 구 선택)</button><br>
+			<button onclick="drawRankChart('Apt', $('#base_ym').val(), $('#years option:selected').val(), $('#region').val(), $('#dong').val());">아파트별(구/동 선택가능)</button><br>
 	</div>
 </div>
 <div id="ym_table_asc_div" class=popup style="display: none; position:absolute; z-index:999;">
@@ -220,6 +257,9 @@ $(document).ready(function(){
 		html += "</tr>:"
 		$('#ym_table_asc > tbody:last').append(html);
 	};
+	$('input#from_ym').val('200601');
+	$('input#to_ym').val(ym);
+	$('input#base_ym').val(ym);
 	for(var y = Number.parseInt(ym / 100); y >= 2006; y--) {
 		var html = "<tr>";
 		for(var m = 1; m <= 12; m++) {
@@ -228,19 +268,36 @@ $(document).ready(function(){
 		html += "</tr>:"
 		$('#ym_table_desc > tbody:last').append(html);
 	};
+
 	$('.one_ym').click( function() {
 		var div = $($(this).parents('div')[0]);
 		var target = div.attr("target");
 		$('#'+target).val($(this).text());
 		div.hide();
 	});
+
 	$(".one_ym").hover(function(){
 		$(this).css("background-color", "yellow");
     }, function(){
 		$(this).css("background-color", $(this).parent().css("background-color"));
 	});
+
 	$(window).click(function(e) {
 		$('.popup').hide();
+	});
+
+	$.ajaxSetup({
+		"error":function() { 
+			alert("서버에서 오류가 발생했습니다.");
+			closeMessage();
+		}
+	});
+
+	$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
+		list = JSON.parse(data);
+		regions = list[0];
+		dongs = list[1];
+		initRegions();
 	});
 });
 

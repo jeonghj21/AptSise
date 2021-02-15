@@ -47,4 +47,27 @@ input.chart-btn:active{top: 3px; outline: none; box-shadow: none;}
 input.chart-btn-hide { background-image: url(images/hide.png); /* 16px x 16px */ }
 input.chart-btn-excel { background-image: url(images/excel.png); /* 16px x 16px */ }
 input.chart-btn-del { background-image: url(images/del.png); /* 16px x 16px */ }
+div.black_background { 
+	display: none; 
+	position: absolute; 
+	top: 0%; 
+	left: 0%; 
+	width: 100%; 
+	height: 100%; 
+	background: #666666 ; 
+	z-index:1001; 
+	-moz-opacity: 0.8; 
+	opacity:.80; 
+	filter: alpha(opacity=60); 
+} 
+div.white_content { 
+	display: none; 
+	position: absolute; 
+	padding: 16px; 
+	width:350px; 
+	border: 16px solid #E3F2FC; 
+	background-color: white; 
+	z-index:1002; 
+	overflow: auto; 
+}
 </style>
