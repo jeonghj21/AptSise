@@ -36,7 +36,7 @@ function refreshDong(val) {
 function constructAptSel(region, dong) {
 
 	var data = [];
-	if ($("#complex").is(":checked")) {
+	if ($("#danji").is(":checked")) {
 		$.each(apts[region+dong], function(idx, r) {
 			if (r[2] != null)
 				data.push(r);
@@ -67,7 +67,7 @@ function refreshApt() {
 
 function requestSaleStat() {
 
-	var complex = $('input#complex').is(":checked") ? "Y" : "N";
+	var danji = $('input#danji').is(":checked") ? "Y" : "N";
 	var from_ym = $('input#from_ym').val();
 	var to_ym = $('input#to_ym').val();
 	var ages = $('select#ages').val();
@@ -91,8 +91,52 @@ function requestSaleStat() {
 		title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
 	}
 
-	drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
+	drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
 
+}
+
+function requestSaleLine() {
+
+	var from_ym = $('input#from_ym').val();
+	var to_ym = $('input#to_ym').val();
+  
+	var area_type = "";
+	var checkboxes = $('input#area_type');
+	for(var i = 0; i < checkboxes.length; i++) {
+		if (checkboxes[i].checked)
+			area_type += checkboxes[i].value;
+	}
+	if (area_type.length == checkboxes.length * 2)
+		area_type = "";
+
+	var apt = $('select#apt option:selected').val();
+	var title = $('select#apt option:selected').text();
+	
+	drawSaleLineChart(apt, title, from_ym, to_ym, area_type);
+
+}
+
+function requestRankChart(gubun) {
+
+	var danji = $('input#danji').is(":checked") ? "Y" : "N";
+	var ages = $('select#ages').val();
+	var age_sign = $('select#age_sign').val();
+  
+	var area_type = "";
+	var checkboxes = $('input#area_type');
+	for(var i = 0; i < checkboxes.length; i++) {
+		if (checkboxes[i].checked)
+			area_type += checkboxes[i].value;
+	}
+	if (area_type.length == checkboxes.length * 2)
+		area_type = "";
+
+	var region = $('select#region').val();
+	if (gubun == 'Region') region = '11000';
+	var dong = $('select#dong').val();
+	if (gubun != 'Apt') dong = '00000';
+	
+	drawRankChart(gubun, $('#base_ym').val(), $('#years option:selected').val(), region, dong, ages, age_sign, area_type);
 }
 
 function toggleTerms() {
@@ -198,7 +242,7 @@ function closeMessage() {
 			<tr>
 				<td>아파트별</td>
 				<td style="font-size: small; padding-left: 0px; padding-right: 0px;">
-					<input type=checkbox id=complex onchange="refreshApt();" />단지만 보기
+					<input type=checkbox id=danji onchange="refreshApt();" />단지만 보기
 				</td>
 			</tr>
 			<tr>
@@ -208,7 +252,7 @@ function closeMessage() {
 			</tr>
 			<tr>
 				<td colspan = 2>
-					<button id='apt_btn' onclick="drawSaleLineChart($('select#apt option:selected').val(), $('select#apt option:selected').text());" disabled>아파트별 평균평단가 추이</button>
+					<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
 				</td>
 			</tr>
 		</table>
@@ -228,9 +272,9 @@ function closeMessage() {
 					<option value={{i}}>{{i}}</option>
 					{%endfor%} 
 				</select>년전<br>
-			<button onclick="drawRankChart('Region', $('#base_ym').val(), $('#years option:selected').val(), '11000', '00000');">구별 순위</button><br>
-			<button onclick="drawRankChart('Dong', $('#base_ym').val(), $('#years option:selected').val(), $('#region').val(), '00000');">동별(위에서 구 선택)</button><br>
-			<button onclick="drawRankChart('Apt', $('#base_ym').val(), $('#years option:selected').val(), $('#region').val(), $('#dong').val());">아파트별(구/동 선택가능)</button><br>
+			<button onclick="requestRankChart('Region');">구별 순위</button><br>
+			<button onclick="requestRankChart('Dong');">동별(위에서 구 선택)</button><br>
+			<button onclick="requestRankChart('Apt');">아파트별(구/동 선택가능)</button><br>
 	</div>
 </div>
 <div id="ym_table_asc_div" class=popup style="display: none; position:absolute; z-index:999;">

@@ -281,48 +281,47 @@ INSERT_APT_SALE_DELETED = """
 			   )
 """
 
-DELETE_APT_SALE_MA = "delete from apt_sale_ma_new where ym = %s"
+DELETE_APT_MA = "delete from apt_ma_new where ym = %s"
+DELETE_APT_REGION_MA = "delete from apt_region_ma_new where ym = %s"
 
 INSERT_APT_SALE_MA = """
-	insert into apt_sale_ma_new
+	insert into apt_ma_new
 		select * from (
-			select '1', a.apt_id ma_id, b.ym, 12, c.made_year, a.area_type, round(avg(a.price/(area/3.3)), 2) ma, count(*) cnt, if(c.k_apt_id is null, 'N', 'Y')
+			select a.apt_id, b.ym, a.area_type, round(avg(a.price), 2) unit_price, count(*) cnt
 			  from tmp_ym b
 				 , apt_sale_new a
 				 , apt_master_new c
 			 where b.ym = %s
 			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
 			   and a.apt_id = c.id
-			 group by b.ym, a.apt_id, c.made_year, a.area_type, c.k_apt_id
+			 group by b.ym, a.apt_id, a.area_type
 		) a
 		 where ma_id is not null
 """
 
 INSERT_APT_STATS_MA = """
-	insert into apt_sale_ma_new
+	insert into apt_region_ma_new
 		select * 
 		  from (
-    		select '2', concat(a.region, a.dong) ma_id, b.ym, 12, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) ma, sum(a.cnt) cnt, a.complex_flag
+    		select a.region, a.dong, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
 	      	  from tmp_ym b, apt_sale_stats_new a
 		 	 where b.ym = %s
 		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
-		 	 group by b.ym, a.region, a.dong, a.complex_flag, a.made_year, a.area_type
+		 	 group by b.ym, a.region, a.dong, a.danji_flag, a.made_year, a.area_type
 		  ) a
-		 where ma_id is not null
 """
 
 INSERT_APT_STATS_MA_REGION = """
-	insert into apt_sale_ma_new
+	insert into apt_region_ma_new
 		select * 
 		  from (
-    		select '2', concat(a.region, '00000') ma_id, b.ym, 12, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) ma, sum(a.cnt) cnt, a.complex_flag
+    		select a.region, '00000', a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
 	      	  from tmp_ym b, apt_sale_stats_new a
 		 	 where b.ym = %s
 			   and region != '11000'
 		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
-		 	 group by b.ym, a.region, a.complex_flag, a.made_year, a.area_type
+		 	 group by b.ym, a.region, a.danji_flag, a.made_year, a.area_type
 		  ) a
-		 where ma_id is not null
 """
 
 DELETE_APT_SALE_STATS_NEW = "delete from apt_sale_stats_new where ym = %s"
@@ -345,19 +344,19 @@ INSERT_APT_SALE_STATS_NEW_Y = """
 
 INSERT_APT_SALE_STATS_NEW_REGION = """
 	insert into apt_sale_stats_new
-		select region, '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), complex_flag
+		select region, '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), danji_flag
 	 	  from apt_sale_stats_new a
 	 	 where a.ym = %s
-	 	 group by region, made_year, area_type, ym, complex_flag
+	 	 group by region, made_year, area_type, ym, danji_flag
 """
 
 INSERT_APT_SALE_STATS_NEW_TOTAL = """
 	insert into apt_sale_stats_new
-		select '11000', '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), complex_flag
+		select '11000', '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), danji_flag
 	 	  from apt_sale_stats_new a
 	 	 where a.ym = %s
 		   and dong = '00000'
-	 	 group by made_year, area_type, ym, complex_flag
+	 	 group by made_year, area_type, ym, danji_flag
 """
 
 UPDATE_JOB_LOG_SUCCESS = """
@@ -435,11 +434,15 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, DELETE_APT_SALE_MA, (ym,))
+	rows = execute_dml(job_key, DELETE_APT_MA, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_MA, (ym,))
+	if rows < 0:
+		job_fail(job_key)
+
+	rows = execute_dml(job_key, DELETE_APT_REGION_MA, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
