@@ -386,8 +386,12 @@ SELECT_CHANGE_RATE_REGION = """
 					and a.ma = 12
 					and b.ma = 12
 					and a.ym = :base_ym
-				    and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m') 
-					and substr(a.ma_id, 1, 5) = substr(b.ma_id, 1, 5)
+				    and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
+					and a.ma_id = b.ma_id
+					and a.danji_flag = 'N'
+					and b.danji_flag = 'N'
+					and substr(a.ma_id, 6, 5) = '00000'
+					and substr(b.ma_id, 6, 5) = '00000'
 				  group by substr(a.ma_id, 1, 5)
 			) a, ref_region r 
 		  where a.region = r.region_cd
@@ -417,6 +421,10 @@ SELECT_CHANGE_RATE_DONG = """
 			    and a.ym = :base_ym                   
 			 	and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')                     
 				and a.ma_id = b.ma_id
+				and a.danji_flag = 'N'
+				and b.danji_flag = 'N'
+				and substr(a.ma_id, 6, 5) <> '00000'
+				and substr(b.ma_id, 6, 5) <> '00000'
 		      group by a.ma_id
 		  ) a, ref_region r, apt_dong d           
 		 where a.region = r.region_cd 
