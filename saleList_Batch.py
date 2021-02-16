@@ -286,7 +286,7 @@ DELETE_APT_SALE_MA = "delete from apt_sale_ma_new where ym = %s"
 INSERT_APT_SALE_MA = """
 	insert into apt_sale_ma_new
 		select * from (
-			select '1', a.apt_id ma_id, b.ym, 12, c.made_year, a.area_type, round(avg(a.price), 2) ma, count(*) cnt, if(c.k_apt_id is null, 'N', 'Y')
+			select '1', a.apt_id ma_id, b.ym, 12, c.made_year, a.area_type, round(avg(a.price/(area/3.3)), 2) ma, count(*) cnt, if(c.k_apt_id is null, 'N', 'Y')
 			  from tmp_ym b
 				 , apt_sale_new a
 				 , apt_master_new c

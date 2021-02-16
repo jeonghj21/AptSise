@@ -448,24 +448,27 @@ def getRankByDong():
 
 
 SELECT_CHANGE_RATE_APT = """
-	select concat(d.dong_name, ' ', m.apt_name) name, a.*          
-		 from (              
+	select concat(d.dong_name, ' ', m.apt_name) name, round(price / before_price, 2) rate,  a.apt_id, a.price, b.before_price
+		 from ( 
 		 	 select a.ma_id apt_id       
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price                   
-				  , round(sum(b.unit_price * b.cnt) / sum(b.cnt), 2) before_price
-         		  , round((sum(a.unit_price * a.cnt) / sum(a.cnt)) / (sum(b.unit_price * b.cnt) / sum(b.cnt)), 2) rate                   
 			   from apt_sale_ma_new a
-         		  , apt_sale_ma_new b                   
 			  where a.ma_type = '1'
-			    and b.ma_type = '1'
 				and a.ma = 12
-				and b.ma = 12
 				and a.ym = :base_ym              
-			    and b.ym = date_format(date_sub(str_to_date(concat(a.ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
-		        and a.ma_id = b.ma_id          
-			  group by a.ma_id         
-		 ) a, apt_master_new m, apt_dong d       
-	 where a.apt_id = m.id  
+			  group by a.ma_id
+			  ) a, (
+		 	 select a.ma_id apt_id       
+			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) before_price                   
+			   from apt_sale_ma_new a
+			  where a.ma_type = '1'
+				and a.ma = 12
+			    and a.ym = date_format(date_sub(str_to_date(concat(:base_ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
+			  group by a.ma_id
+			  ) b,
+		 apt_master_new m, apt_dong d       
+	 where a.apt_id = b.apt_id
+	   and a.apt_id = m.id  
 	   and m.region = d.region_cd
 	   and m.dong = d.dong_cd
 """
