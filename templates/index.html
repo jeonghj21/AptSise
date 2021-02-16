@@ -172,7 +172,7 @@ function makeRankChart2TableHTML(gubun, data) {
 	return html;
 }
 
-function getRankURL(gubun, base_ym, years, region, dong, orderby = 0, page = 1) {
+function getRankChartURL(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
 
 	let url = "{{ config['BASE_URL'] }}";
 
@@ -183,6 +183,10 @@ function getRankURL(gubun, base_ym, years, region, dong, orderby = 0, page = 1) 
 		url += "&region=" + region;
 	if (dong != '00000')
 		url += "&dong=" + dong;
+
+	url += "&ages=" + ages;
+	url += "&age_sign=" + age_sign;
+	url += "&area_type=" + area_type;
 
 	return url;
 
@@ -202,7 +206,7 @@ function excelRankChart() {
 
 	var title = myChart.data.datasets[0].label;
 
-	url = getRankURL(myChart.gubun, myChart.base_ym, myChart.years, myChart.orderby, -1);
+	url = getRankChartURL(myChart.gubun, myChart.base_ym, myChart.years, myChart.ages, myChart.age_sign, myChart.area_type, myChart.orderby, -1);
 
     // $('#processLoading').show();
 	showMessage();
@@ -365,7 +369,6 @@ function drawLegend(chart) {
 
 }
 
-
 function createChart(title, labels, type, func) {
 	var ctx = document.getElementById("myChart").getContext("2d");
 	myChart = new Chart (ctx, {
@@ -395,15 +398,43 @@ function createChart(title, labels, type, func) {
 		// make sure click was on an actual point
 		if (activePoint.length > 0) {
 			var clickedDatasetIndex = activePoint[0]._datasetIndex;
+			var clickedDataIndex = activePoint[0]._index;
 			var key = myChart.data.datasets[clickedDatasetIndex].label;
 			var chart = gChartData.get(key);
-			if (chart != null && chart.apt != null) {
-				var label = myChart.data.labels[activePoint[0]._index];
+
+			var label = myChart.data.labels[activePoint[0]._index];
+			if (chart && chart.apt) {
 				$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+chart.apt+"&ym="+label, function(jsonData){
 					data = JSON.parse(jsonData);
 					showAptSaleTable(evt, data);
 				});
 				return;
+			} else {
+				if (myChart.gubun != undefined) {
+					var data = gChartData.get('Data');
+						let yy = parseInt(myChart.base_ym.substr(0,4)) - parseInt(myChart.years) - 1;
+						let mm = parseInt(myChart.base_ym.substr(4,2));
+						if (mm == 12) {
+							yy++;
+							mm = 1;
+						} else
+							mm++;
+						var from_ym = '' + yy + (mm < 10 ? "0"+mm : mm);
+						to_ym = myChart.base_ym;
+						region = data['region'][clickedDataIndex];
+					switch(myChart.gubun) {
+					case 'Region':
+						drawSaleStat('N', from_ym, to_ym, myChart.ages, myChart.age_sign, myChart.area_type, region, '', label);
+						break;
+					case 'Dong':
+						dong = data['dong'][clickedDataIndex];
+						drawSaleStat('N', from_ym, to_ym, myChart.ages, myChart.age_sign, myChart.area_type, region, dong, label);
+						break;
+					case 'Apt':
+						apt = data['apt'][clickedDataIndex];
+						drawSaleLineChart(apt, label, from_ym, to_ym, myChart.area_type);
+					}
+				}
 			}
 		}
 		$("#aptSaleDiv").hide();
@@ -630,7 +661,7 @@ function drawNewChart(title, labels, data, apt, volume_data, ma_data){
 
 }
 
-function drawSaleLineChart(apt, title) {
+function drawSaleLineChart(apt, title, from_ym, to_ym, area_type) {
 
 	if (apt == undefined || apt == "") {
 		alert('아파트가 선택도지 않았습니다.');
@@ -648,7 +679,7 @@ function drawSaleLineChart(apt, title) {
 
   //$('#processLoading').show();
   showMessage();
-  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt, function(jsonData){
+  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt+"&from_ym="+from_ym+"&to_ym="+to_ym+"&area_type="+area_type, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data['data'], apt, data['cnt'], data['maData']);
   	//$('#processLoading').hide();
@@ -657,8 +688,8 @@ function drawSaleLineChart(apt, title) {
 
 }
 
-function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
-  params = "complex=" + complex;
+function drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
+  params = "danji=" + danji;
   params += "&from_ym=" + from_ym;
   params += "&to_ym=" + to_ym;
   params += "&ages=" + ages;
@@ -667,9 +698,9 @@ function drawSaleStat(complex, from_ym, to_ym, ages, age_sign, area_type, region
   params += "&region=" + region;
   params += "&dong=" + dong;
 
-  if (complex + from_ym + to_ym + ages + area_type != "") {
+  if (danji + from_ym + to_ym + ages + area_type != "") {
     title += " (";
-    if (complex == "Y"){
+    if (danji == "Y"){
       title += "등록된 단지만";
     } else {
       title += "모든 실거래";
@@ -751,7 +782,7 @@ function drawRankLegend(chart) {
 
 function redrawRankChart(orderby) {
 	
-	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, orderby);
+	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, myChart.ages, myChart.age_sign, myChart.area_type, orderby);
 
 }
 
@@ -762,11 +793,11 @@ function drawRankChartPage(next) {
 		page += 1;
 	else
 		page -= 1;
-	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, myChart.orderby, page);
+	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, myChart.ages, myChart.age_sign, myChart.area_type, myChart.orderby, page);
 		
 }
 
-function drawRankChart(gubun, base_ym, years, region, dong, orderby = 0, page = 1) {
+function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
 	
 	$("#draw_options > input:checkbox").attr("disabled",true);
 	let title = '';
@@ -778,7 +809,7 @@ function drawRankChart(gubun, base_ym, years, region, dong, orderby = 0, page = 
 		base_ym = year + "" + (month<10?"0"+month:month);
 	}
 
-	let url = getRankURL(gubun, base_ym, years, region, dong, orderby, page);
+	let url = getRankChartURL(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby, page);
 
 	switch(gubun) {
 		case 'Region':
@@ -805,6 +836,8 @@ function drawRankChart(gubun, base_ym, years, region, dong, orderby = 0, page = 
 		let func = function(chart) { return drawRankLegend(chart); };
 		createChart(title, data['labels'], 'line', func);
 
+		gChartData.set('Data', data);
+
 		myChart.options.tooltips.callbacks = {
         	beforeBody: function(tooltipItem, data) {
 				if (tooltipItem.length != 1) return;
@@ -829,6 +862,9 @@ function drawRankChart(gubun, base_ym, years, region, dong, orderby = 0, page = 
 		myChart.orderby = orderby;
 		myChart.region = region;
 		myChart.dong = dong;
+		myChart.ages = ages;
+		myChart.age_sign = age_sign;
+		myChart.area_type = area_type;
 
 		makeChartDataset('line', title, 'A', data['data']);
 
