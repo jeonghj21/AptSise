@@ -36,6 +36,30 @@ function setPopupPosition(event, popup) {
 
 	    return popupPosition; 
 } 
+const minColor = 70;
+const maxColor = 230; 
+var colorGap = 50;
+var colorArr = [minColor, minColor, minColor];
+var curColor = 0;
+
+function getNextChartColor() {
+	
+	var rgb = 'rgb('+colorArr[0]+','+colorArr[1]+','+colorArr[2]+')';
+
+	colorArr[curColor] += colorGap;
+			    
+    if (colorArr[curColor] > maxColor) {
+    	colorArr[curColor] = minColor;
+        curColor++;
+		if (curColor == 3) curColor = 0;
+    }
+														      
+	return rgb;
+}  
+
+function resetChartColor() {
+	colorArr = [minColor, minColor, minColor];
+}
 
 function showAptSaleTable(event, data) {
   $('#aptSaleTable > tbody:last').empty();
@@ -354,6 +378,8 @@ function drawLegend(chart) {
 			continue;
 		if (j > 0)
 			text.push("&nbsp;|&nbsp;");
+		var color = chart.data.datasets[i].backgroundColor ? chart.data.datasets[i].backgroundColor : chart.options.defaultColor;
+		text.push('<span style="background-color: ' + color + ';">&nbsp;&nbsp;&nbsp;&nbsp;</span>'); 
 		text.push('<span class="line" id="legend'+i+'" style="font-size:small;" onmouseover="setLineThick('+i+', true);" onmouseout="setLineThick('+i+', false);" >'); 
 		text.push(chart.data.datasets[i].label+'</span>');
 		text.push("<input type=button title='숨기기' class='chart-btn chart-btn-hide' onclick='hideChart($(this), "+i+");' />");
@@ -370,6 +396,8 @@ function drawLegend(chart) {
 }
 
 function createChart(title, labels, type, func) {
+	resetChartColor();
+
 	var ctx = document.getElementById("myChart").getContext("2d");
 	myChart = new Chart (ctx, {
 		type: type,
@@ -576,11 +604,15 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 		yAxisID: yAxisID,
 		pointColor: 'blue',
 		strokeColor: 'blue',
+		backgroundColor: getNextChartColor(),
 		data: data,
 		spanGaps: true
 	};
 	if (color)
 		dataset.thickColor = color;
+
+	if (chartType == 'line')
+		dataset.fill = false;
 
 	if (additionalParams)
 		Object.keys(additionalParams).forEach(function(key) { 
