@@ -296,7 +296,6 @@ INSERT_APT_SALE_MA = """
 			   and a.apt_id = c.id
 			 group by b.ym, a.apt_id, a.area_type
 		) a
-		 where ma_id is not null
 """
 
 INSERT_APT_STATS_MA = """
