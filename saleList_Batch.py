@@ -234,7 +234,7 @@ INSERT_JOB_LOG = "insert into job_log values(%s, %s, %s, str_to_date(%s, '%Y%m%d
 
 INSERT_APT_MASTER_NEW = """
 	insert into apt_master_new 
-		select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도,'' 
+		select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도,null,'N' 
 		  from tmp_raw_data2
 	 	 where (건축년도,법정동시군구코드,아파트)
 	 	   not in (select made_year, region, apt_name from apt_master_new)
