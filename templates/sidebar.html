@@ -1,8 +1,8 @@
 <!-- Sidebar -->
 <script>
-var regions = [];
-var dongs = {};
-var apts = {};
+var gRegionsMap = {};
+var gDongsMap = {};
+var gAptMap = {};
 var draw_options = {};
 
 function setDrawOption(checkbox) {
@@ -15,6 +15,14 @@ function constructSel(sel, data, allTitle, allValue) {
 	option.value = allValue;
 	option.innerText = allTitle;
 	sel.append(option);
+	var temp = [];
+	if (!Array.isArray(data) && typeof data == "object") {
+		for(const key in data) {
+			temp.push([key, data[key]]);
+		}
+		data = temp;
+	}
+	data.sort(function(a, b) { return (a[1] < b[1]) ? -1 : ((a[1] == b[1]) ? 0 : 1); });
 	$.each(data, function(idx, r) {
 		option = document.createElement("option");
 		option.value = r[0];
@@ -25,48 +33,87 @@ function constructSel(sel, data, allTitle, allValue) {
 
 function initRegions() {
 	sel = $("#region");
-	constructSel(sel, regions, "서울 전체", "11000");
+	constructSel(sel, gRegionsMap, "서울 전체", "11000");
 }
 
 function refreshDong(val) {
 	var sel = $("#dong");
-	constructSel(sel, dongs[val], "구 전체", "00000");
+	var dongs = [];
+	if (val != '11000')
+		dongs = gDongsMap[val];
+	constructSel(sel, dongs, "구 전체", "00000");
 }
 
 function constructAptSel(region, dong) {
 
 	var data = [];
 	if ($("#danji").is(":checked")) {
-		$.each(apts[region+dong], function(idx, r) {
+		$.each(gAptMap[region+dong], function(idx, r) {
 			if (r[2] != null)
 				data.push(r);
 		});
 		list = data;
 	} else {
-		data = apts[region+dong];
+		data = gAptMap[region+dong];
 	}
 
-	constructSel($("#apt"), data, "아파트를 선택하세요", "All");
+	constructSel($("#apt"), data, "아파트를 선택하세요", "");
 }
 
 function refreshApt() {
 
 	region = $("#region").val();
 	dong = $("#dong").val();
-	if (apts[region+dong] != null) {
+	if (gAptMap[region+dong] != null) {
 		constructAptSel(region, dong);
 		return;
 	}
 
 	url = "{{ config['BASE_URL'] }}getApt?region="+region+"&dong="+dong;
 	$.getJSON(url, function(data){
-		apts[region+dong] = JSON.parse(data);
+		gAptMap[region+dong] = JSON.parse(data);
 		constructAptSel(region, dong);
 	});
 }
 
+function getChartConditions() {
+
+	params = {};
+	dup_params = {};
+
+	$('#chart_conditions input, #chart_conditions select').each(function(index, item) {
+		input = $(item);
+
+		// skip if no input, not checked
+		if (input.val() == null || (input.attr('type') == 'checkbox' && !input.is(':checked')))
+			return;
+		key = input.attr('id');
+		value = params[key];
+		if (value != null) {
+			// to check multi-checkbox all checked
+			count = dup_params[key];
+			if (count == null) count = 1;
+			dup_params[key] = count+1;
+		} else
+			value = '';
+		value += input.val();
+		params[key] = value;
+	});
+
+	for(const key in dup_params) {
+		tags = $('#chart_conditions #'+key);
+		// if multi-checkbox all checked clear the condition
+		if (dup_params[key] == tags.length)
+			params[key] = '';
+	}
+
+	return params;
+
+}
+
 function requestSaleStat() {
 
+/*
 	var danji = $('input#danji').is(":checked") ? "Y" : "N";
 	var from_ym = $('input#from_ym').val();
 	var to_ym = $('input#to_ym').val();
@@ -84,6 +131,10 @@ function requestSaleStat() {
 
 	var region = $('select#region').val();
 	var dong = $('select#dong').val();
+*/
+
+	var params = getChartConditions();
+
 	var title;
 	if ($("select#dong")[0].selectedIndex <= 0) {
 		title = $('select#region option:checked').text();
@@ -91,12 +142,16 @@ function requestSaleStat() {
 		title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
 	}
 
-	drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
+//	drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
+	// delete unnecessary parameter 'apt' for region stat
+	delete params['apt'];
+	drawSaleStat(params, title);
 
 }
 
 function requestSaleLine() {
 
+/*
 	var from_ym = $('input#from_ym').val();
 	var to_ym = $('input#to_ym').val();
   
@@ -110,14 +165,20 @@ function requestSaleLine() {
 		area_type = "";
 
 	var apt = $('select#apt option:selected').val();
-	var title = $('select#apt option:selected').text();
 	
-	drawSaleLineChart(apt, title, from_ym, to_ym, area_type);
+*/
+
+	var title = $('select#apt option:selected').text();
+	var params = getChartConditions();
+
+//	drawSaleLineChart(apt, title, from_ym, to_ym, area_type);
+	drawSaleLineChart(params, title);
 
 }
 
 function requestRankChart(gubun) {
 
+/*
 	var danji = $('input#danji').is(":checked") ? "Y" : "N";
 	var ages = $('select#ages').val();
 	var age_sign = $('select#age_sign').val();
@@ -136,7 +197,15 @@ function requestRankChart(gubun) {
 	var dong = $('select#dong').val();
 	if (gubun != 'Apt') dong = '00000';
 	
-	drawRankChart(gubun, $('#base_ym').val(), $('#years option:selected').val(), region, dong, ages, age_sign, area_type);
+*/
+
+	var params = getChartConditions();
+
+	params['base_ym'] = $('#base_ym').val();
+	params['years'] = $('#years option:selected').val();
+
+//	drawRankChart(gubun, $('#base_ym').val(), $('#years option:selected').val(), region, dong, ages, age_sign, area_type);
+	drawRankChart(gubun, params);
 }
 
 function toggleTerms() {
@@ -192,32 +261,10 @@ function closeMessage() {
 
 </script>
 <div class="sidebar" style="width:200px; margin-left:5px;">
-	<div class="my-box">
+	<div class="my-box" id="chart_conditions">
 	<label><strong>조회기간</strong></label><br>
 		<input id=from_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym', false);">▼</a> ~ 
 		<input id=to_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym', true); return false;">▼</a><br>
-		<span class="bar-item"><strong>추가 조건</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a><br>
-		<div id=toggle_term style="display:none;">
-			<label>연식:</label>
-				<select id=ages>
-					<option value="">ALL</option>
-					{%for i in range(1, 20)%} 
-					<option value={{i}}>{{i}}</option>
-					{%endfor%} 
-				</select> 년
-				<select id=age_sign>
-					<option value="<">이내</option>
-					<option value=">">이상</option>
-				</select><br>
-			<label>전용면적</label><br>
-				<input type=checkbox id=area_type value=01 checked>60m<sup>2</sup> 이하<br>
-				<input type=checkbox id=area_type value=02 checked>60~85m<sup>2</sup> 이하<br>
-				<input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
-				<input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
-		</div>
-	</div>
-	<div class="my-box">
-		<label><strong>평균평단가 추이</strong></label><br>
 		<table>
 			<tr>
 				<td>구 선택</td><td>동 선택</td>
@@ -235,34 +282,48 @@ function closeMessage() {
 				</td>
 			</tr>
 			<tr>
-				<td colspan = 2>
-					<button id='region_btn' onclick="requestSaleStat();">구/동별 평균평단가 추이</button>
-				</td>
-			</tr>
-			<tr>
-				<td>아파트별</td>
+				<td>아파트 선택</td>
 				<td style="font-size: small; padding-left: 0px; padding-right: 0px;">
-					<input type=checkbox id=danji onchange="refreshApt();" />단지만 보기
+					<input type=checkbox id=danji value=Y onchange="refreshApt();" />단지만
 				</td>
 			</tr>
 			<tr>
 				<td colspan = 2>
-					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == 'All');"></select>
-				</td>
-			</tr>
-			<tr>
-				<td colspan = 2>
-					<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
+					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == '');"></select>
 				</td>
 			</tr>
 		</table>
+		<span class="bar-item"><strong>추가 조건</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a><br>
+		<div id=toggle_term style="display:none;">
+			<label>연식:</label>
+				<select id=ages>
+					<option value="">ALL</option>
+					{%for i in range(1, 20)%} 
+					<option value={{i}}>{{i}}</option>
+					{%endfor%} 
+				</select> 년
+				<select id=age_sign>
+					<option value="<">이내</option>
+					<option value="=>">이상</option>
+				</select><br>
+			<label>전용면적</label><br>
+				<input type=checkbox id=area_type value=01 checked>60m<sup>2</sup> 이하<br>
+				<input type=checkbox id=area_type value=02 checked>60~85m<sup>2</sup> 이하<br>
+				<input type=checkbox id=area_type value=03 checked>85~135m<sup>2</sup> 이하<br>
+				<input type=checkbox id=area_type value=04 checked>135m<sup>2</sup> 초과
+		</div>
 	</div>
-	<div id="draw_options" class="my-box">
-		<label><strong>차트 옵션</strong></label><br>
+	<div class="my-box">
+		<label><strong>평균평단가 추이</strong></label><br>
+		<button id='region_btn' onclick="requestSaleStat();">구/동별 평균평단가 추이</button>
+		<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
+		<div id="draw_options">
+			<label><strong>차트 옵션</strong></label><br>
 			<input id=draw_overlap type=checkbox onchange="setDrawOption(this);">겹쳐 그리기</input><br>
 			<input id=draw_relative type=checkbox onchange="setDrawOption(this); updateChart();">상대수치로 보기</input><br>
 			<input id=draw_ma type=checkbox onchange="setDrawOption(this); updateChart();">연간 이동평균 같이 보기</input><br>
 			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
+		</div>
 	</div>
 	<div class="my-box">
 		<label><strong>연간 평균평단가 비교</strong></label><br>
@@ -339,8 +400,8 @@ $(document).ready(function(){
 
 	$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
 		list = JSON.parse(data);
-		regions = list[0];
-		dongs = list[1];
+		gRegionsMap = list[0];
+		gDongsMap = list[1];
 		initRegions();
 	});
 });

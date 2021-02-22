@@ -104,7 +104,7 @@ def getSale():
 	if area_type != "":
 		add_conditions += ")"
 
-	sql = SELECT_APT_SALE_LIST + " from (" + SELECT_APT_SALE_MA + SELECT_APT_SALE_MA_GROUP_BY + \
+	sql = SELECT_APT_SALE_LIST + " from (" + SELECT_APT_SALE_MA + add_conditions + SELECT_APT_SALE_MA_GROUP_BY + \
 		") b left outer join (" + SELECT_APT_SALE + add_conditions + SELECT_APT_SALE_GROUP_BY + ") a " + SELECT_APT_SALE_JOIN_ON 
 
 	print(sql)
@@ -112,9 +112,9 @@ def getSale():
 		result = connection.execute(text(sql), apt=apt)
 
 	rows=result.fetchall()            
-	json_data = { 'labels': [], 'data':[], 'maData':[], 'cnt':[] }
+	json_data = { 'labels': [], 'data':[], 'ma':[], 'cnt':[] }
 
-	spreadDataForYM(rows, 'ym', json_data['labels'], [['price', json_data['data']], ['ma', json_data['maData']], ['cnt', json_data['cnt']]])
+	spreadDataForYM(rows, 'ym', json_data['labels'], [['price', json_data['data']], ['ma', json_data['ma']], ['cnt', json_data['cnt']]])
 
 	json_return=json.dumps(json_data)   #string #json
  
@@ -126,12 +126,12 @@ SELECT_DONGS = "select * from apt_dong where region_cd = :region and valid = 'Y'
 def getDong():
 
 	data = []
-	regions = []
+	regions = {}
 
 	with app.engine.connect() as connection:
 		result = connection.execute(text(SELECT_REGIONS))
 	for res in result:
-		regions.append([res['region_cd'], res['region_name']])
+		regions[res['region_cd']] = res['region_name']
 
 	data.append(regions)
 
@@ -139,10 +139,10 @@ def getDong():
 	for r in regions:
 		dongs_in_r = []
 		with app.engine.connect() as connection:
-			result = connection.execute(text(SELECT_DONGS), region=r[0])
+			result = connection.execute(text(SELECT_DONGS), region=r)
 		for res in result:
 			dongs_in_r.append([res['dong_cd'], res['dong_name']])
-		dongs[r[0]] = dongs_in_r
+		dongs[r] = dongs_in_r
 
 	data.append(dongs)
     
@@ -245,6 +245,7 @@ def getAptSale():
 	apt = params['apt']
 	sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale_new"
 	sql += " where apt_id = " + apt 
+	sql += getAddConditions(params, { 'ym', 'area_type' })
 	if 'ym' in params:
 		sql += " and ym = '" + params['ym'] + "'"
 	sql += " order by saled"
@@ -351,7 +352,7 @@ def getSaleStatTotal():
  
 	return jsonify(json_return)
 
-def getAddConditions( params ):
+def getAddConditions( params, required ):
 
 	empty_params = []
 	for param in params:
@@ -362,19 +363,21 @@ def getAddConditions( params ):
 		del params[param]
 
 	add_conditions = ""
-	if 'danji' in params:
+	if 'danji' in params and (len(required) == 0 or 'danji' in required):
 		add_conditions += " and danji_flag = '" + params['danji'] + "'"
-	if 'from_ym' in params:
+	if 'from_ym' in params and (len(required) == 0 or 'from_ym' in required):
 		add_conditions += " and ym >= '" + params['from_ym'] + "'"
-	if 'to_ym' in params:
+	if 'to_ym' in params and (len(required) == 0 or 'to_ym' in required):
 		add_conditions += " and ym <= '" + params['to_ym'] + "'"
-	if 'region' in params:
+	if 'ym' in params and (len(required) == 0 or 'ym' in required):
+		add_conditions += " and ym = '" + params['ym'] + "'"
+	if 'region' in params and (len(required) == 0 or 'region' in required) and params['region'] != '11000':
 		add_conditions += " and region = '" + params['region'] + "'"
-	if 'dong' in params:
+	if 'dong' in params and (len(required) == 0 or 'dong' in required) and params['dong'] != '00000':
 		add_conditions += " and dong = '" + params['dong'] + "'"
 
 	area_type = ""
-	if 'area_type' in params:
+	if 'area_type' in params and (len(required) == 0 or 'area_type' in required):
 		add_conditions += " and ("
 		area_type = params['area_type']
 	pos = 0
@@ -383,20 +386,20 @@ def getAddConditions( params ):
 			add_conditions += " or "
 		add_conditions += " area_type = '" + area_type[pos:pos+2] + "'"
 		pos = pos + 2
-	if 'area_type' in params:
+	if pos > 0:
 		add_conditions += ")"
-	if 'ages' in params and 'age_sign' in params: 
+	if 'ages' in params and 'age_sign' in params and (len(required) == 0 or ('ages' in required and 'age_sign' in required)): 
 		add_conditions += " and " + str(date.today().year - int(params['ages'])) + params['age_sign'] + " made_year"
 
 	return add_conditions 
 
 
 PAGE_SIZE = 30
-def getRankCommon(request, sqlarr):
+def getRankCommon(request, sqlarr, requiredParams):
 
 	params = request.args.to_dict()
 	
-	cond = getAddConditions(params)
+	cond = getAddConditions(params, requiredParams)
 
 	sql = ""
 	for i in range(len(sqlarr)-1):
@@ -404,17 +407,20 @@ def getRankCommon(request, sqlarr):
 
 	sql = sql + sqlarr[len(sqlarr)-1]
 
-	base_ym = params['base']
+	base_ym = params['base_ym']
 	years = params['years']
 	orderby = params['orderby']
+	if orderby != 'name':
+		orderby = orderby + " desc"
+
 	page = 1
 	if 'page' in params:
 		page = int(params['page'])
 
 	if page == -1:
-		sql = text(sql + " order by " + orderby + " desc")
+		sql = text(sql + " order by " + orderby)
 	else:
-		sql = text(sql + " order by " + orderby + " desc limit " + str(PAGE_SIZE+1) + " offset " + str((page-1)*PAGE_SIZE))
+		sql = text(sql + " order by " + orderby + " limit " + str(PAGE_SIZE+1) + " offset " + str((page-1)*PAGE_SIZE))
 	print(sql)
 	with app.engine.connect() as connection:
 		result = connection.execute(sql, base_ym=base_ym, mm = int(years)*12)
@@ -440,54 +446,54 @@ def getRankCommon(request, sqlarr):
 
 	return json_return
 
-SELECT_CHANGE_RATE_REGION_1 = """
+SELECT_CHANGE_RATE_REGION = ["""
 	select a.*, a.region, '' dong, '' apt
 	  from (
 		select r.region_name name, a.price, b.before_price, a.region
-				  , round(price / before_price, 2) rate  
+				  , round((price / before_price)*100, 2) rate  
 		 from (
 		 	 select region
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
 				  from apt_region_ma_new a
 				  where a.ym = :base_ym
+""",
 """
-SELECT_CHANGE_RATE_REGION_2 = """
 				  group by region
 			) a, (
 		 	 select region
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) before_price
 				  from apt_region_ma_new a
 				  where a.ym = date_format(date_sub(str_to_date(concat(:base_ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
+""",
 """
-SELECT_CHANGE_RATE_REGION_3 = """
 				  group by region
 			) b, ref_region r 
 		  where a.region = b.region
 		    and a.region = r.region_cd
 	) a
-"""
+"""]
 
 @app.route("/getRankByRegion")
 def getRankByRegion():
 
-	json_return = getRankCommon(request, [SELECT_CHANGE_RATE_REGION_1, SELECT_CHANGE_RATE_REGION_2, SELECT_CHANGE_RATE_REGION_3])
+	json_return = getRankCommon(request, SELECT_CHANGE_RATE_REGION, { 'ages', 'age_sign', 'area_type' })
 
 	return jsonify(json_return)
 
 
-SELECT_CHANGE_RATE_DONG_1 = """
+SELECT_CHANGE_RATE_DONG = ["""
 	select a.*, a.region, a.dong, '' apt
 	  from (
 		select concat(r.region_name, ' ', d.dong_name) name, a.price, b.before_price, a.region, a.dong
-				  , round(price / before_price, 2) rate  
+				  , round((price / before_price)*100, 2) rate  
 		 from (
 		 	 select region
 			      , dong
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
 				  from apt_region_ma_new a
 				  where a.ym = :base_ym
+""",
 """
-SELECT_CHANGE_RATE_DONG_2 = """
 				  group by a.region, a.dong
 			) a, (
 		 	 select region
@@ -495,8 +501,8 @@ SELECT_CHANGE_RATE_DONG_2 = """
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) before_price
 				  from apt_region_ma_new a
 				  where a.ym = date_format(date_sub(str_to_date(concat(:base_ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
+""",
 """
-SELECT_CHANGE_RATE_DONG_3 = """
 				  group by a.region, a.dong
 			) b, ref_region r, apt_dong d 
 		  where a.region = b.region
@@ -506,29 +512,29 @@ SELECT_CHANGE_RATE_DONG_3 = """
 			and a.dong = d.dong_cd
 	) a
 	where 1 = 1
-"""
+"""]
 
 @app.route("/getRankByDong")
 def getRankByDong():
 
-	json_return = getRankCommon(request, [SELECT_CHANGE_RATE_DONG_1, SELECT_CHANGE_RATE_DONG_2, SELECT_CHANGE_RATE_DONG_3])
+	json_return = getRankCommon(request, SELECT_CHANGE_RATE_DONG, { 'region', 'ages', 'age_sign', 'area_type' })
 
 	return jsonify(json_return)
 
 
-SELECT_CHANGE_RATE_APT_1 = """
+SELECT_CHANGE_RATE_APT = ["""
 	select a.*, a.region, a.dong, a.apt_id apt
 	  from (
 		select concat(d.dong_name, ' ', m.apt_name) name, a.apt_id, a.price, b.before_price, d.region_cd region, d.dong_cd dong
-				  , round(price / before_price, 2) rate  
+				  , round((price / before_price) * 100, 2) rate  
 		 from (
 		 	 select a.apt_id
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) price
 				  from apt_ma_new a, apt_master_new b
 				  where a.ym = :base_ym
 					and a.apt_id = b.id
+""",
 """
-SELECT_CHANGE_RATE_APT_2 = """
 				  group by a.apt_id
 			) a, (
 		 	 select a.apt_id
@@ -536,8 +542,8 @@ SELECT_CHANGE_RATE_APT_2 = """
 				  from apt_ma_new a, apt_master_new b
 				  where a.ym = date_format(date_sub(str_to_date(concat(:base_ym, '01'), '%Y%m%d'), interval :mm month), '%Y%m')
 					and a.apt_id = b.id
+""",
 """
-SELECT_CHANGE_RATE_APT_3 = """
 				  group by a.apt_id
 		 ) b, apt_master_new m, apt_dong d       
 	 where a.apt_id = b.apt_id
@@ -546,12 +552,12 @@ SELECT_CHANGE_RATE_APT_3 = """
 	   and m.dong = d.dong_cd
 	) a
 	where 1 = 1
-"""
+"""]
 
 @app.route("/getRankByApt")
 def getRankByApt():
 
-	json_return = getRankCommon(request, [SELECT_CHANGE_RATE_APT_1, SELECT_CHANGE_RATE_APT_2, SELECT_CHANGE_RATE_APT_3])
+	json_return = getRankCommon(request, SELECT_CHANGE_RATE_APT, { 'danji', 'region', 'dong', 'ages', 'age_sign', 'area_type' })
 
 	return jsonify(json_return)
 

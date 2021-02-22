@@ -287,7 +287,7 @@ DELETE_APT_REGION_MA = "delete from apt_region_ma_new where ym = %s"
 INSERT_APT_SALE_MA = """
 	insert into apt_ma_new
 		select * from (
-			select a.apt_id, b.ym, a.area_type, round(avg(a.price), 2) unit_price, count(*) cnt
+			select a.apt_id, b.ym, a.area_type, round(avg(a.price/(a.area/3.3)), 2) unit_price, count(*) cnt
 			  from tmp_ym b
 				 , apt_sale_new a
 				 , apt_master_new c

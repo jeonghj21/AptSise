@@ -10,6 +10,8 @@
 <script>
 var myChart = null;
 var gChartData = new Map();
+var gChartArea = '';
+const gOrderByOptions = [ ['rate', '상승율순 조회'], ['price', '기준가격순 조회'], ['name', '가나다순 조회']];
 
 function setPopupPosition(event, popup) { 
 
@@ -128,31 +130,31 @@ function makeChart2TableHTML(chart) {
 	var html = "<tr>";
 	html += "<th>년월</th>";
 	html += "<th>평균평단가</th>";
-	if (chart.ma_data) {
+	if (chart.data['ma']) {
 		html += "<th>평균평단가(1YR)</th>";
 	}
-	if (chart.volume_data) {
+	if (chart.data['cnt']) {
 		html += "<th>거래건수</th>";
 	}
 	html += "</tr>";
 	var labels = Object.values(chart.labels);
-	var data = Object.values(chart.data);
+	var data = Object.values(chart.data['data']);
 	var volume_data = null;
 	var ma_data = null;
-	if (chart.volume_data) {
-		volume_data = Object.values(chart.volume_data);
+	if (chart.data['cnt']) {
+		volume_data = Object.values(chart.data['cnt']);
 	}
-	if (chart.ma_data) {
-		ma_data = Object.values(chart.ma_data);
+	if (chart.data['ma']) {
+		ma_data = Object.values(chart.data['ma']);
 	}
 	for(var i = 0; i < data.length; i++) {
 		html += "<tr>";
 		html += "<td>"+labels[i]+"</td>";
 		html += "<td>"+(data[i]==null?"":data[i])+"</td>";
-		if (chart.ma_data) {
+		if (chart.data['ma']) {
 			html += "<td>"+(ma_data[i]==null?"":ma_data[i])+"</td>";
 		}
-		if (chart.volume_data) {
+		if (chart.data['cnt']) {
 			html += "<td>"+(volume_data[i]==null?"":volume_data[i])+"</td>";
 		}
 		html += "</tr>";
@@ -160,34 +162,15 @@ function makeChart2TableHTML(chart) {
 	return html;
 }
 
-function makeRankChart2TableHTML(gubun, data) {
-	var html = "<tr>";
-	switch(gubun) {
-		case 'Region':
-			html += "<th>구</th>";
-			break;
-		case 'Dong':
-			html += "<th>구</th>";
-			html += "<th>동</th>";
-			break;
-		case 'Apt':
-			html += "<th>구</th>";
-			html += "<th>아파트</th>";
-			break;
-	}
+function makeRankChart2TableHTML(data) {
+	var html = "<tr><th>구분</th>";
 	html += "<th>상승율</th>";
-	html += "<th>"+myChart.base_ym+"의 연간 평단가</th>";
-	html += "<th>"+myChart.years+"년 전의 연간 평단가</th>";
+	html += "<th>"+myChart.data.datasets[1].label+"</th>";
+	html += "<th>"+myChart.data.datasets[2].label+"</th>";
 	html += "</tr>";
 	for(var i = 0; i < data['labels'].length; i++) {
 		html += "<tr>";
-		if (gubun == 'Region') {
-			html += "<td>"+data['labels'][i]+"</td>";
-		} else {
-			var labels = data['labels'][i].split(' ');
-			html += "<td>"+labels[0]+"</td>";
-			html += "<td>"+labels[1]+"</td>";
-		}
+		html += "<td>"+data['labels'][i]+"</td>";
 		html += "<td>"+data['data'][i]+"</td>";
 		html += "<td>"+data['price'][i]+"</td>";
 		html += "<td>"+data['before_price'][i]+"</td>";
@@ -196,23 +179,9 @@ function makeRankChart2TableHTML(gubun, data) {
 	return html;
 }
 
-function getRankChartURL(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
+function getRankChartURL(gubun, params) {
 
-	let url = "{{ config['BASE_URL'] }}";
-
-	url += "getRankBy" + gubun;
-	url += "?base="+base_ym+"&years="+years+"&page="+page+"&orderby="+orderByOptions[orderby][0];
-
-	if (region != '11000')
-		url += "&region=" + region;
-	if (dong != '00000')
-		url += "&dong=" + dong;
-
-	url += "&ages=" + ages;
-	url += "&age_sign=" + age_sign;
-	url += "&area_type=" + area_type;
-
-	return url;
+	return getChartURL("getRankBy" + gubun, params);
 
 }
 
@@ -230,13 +199,15 @@ function excelRankChart() {
 
 	var title = myChart.data.datasets[0].label;
 
-	url = getRankChartURL(myChart.gubun, myChart.base_ym, myChart.years, myChart.ages, myChart.age_sign, myChart.area_type, myChart.orderby, -1);
+	chartData = gChartData.get(title);
+
+	url = getRankChartURL(gChartArea, chartData.params);
 
     // $('#processLoading').show();
 	showMessage();
 	$.getJSON(url, function(jsonData){
 		data = JSON.parse(jsonData);
-		table2excel(title, makeRankChart2TableHTML(myChart.gubun, data) );
+		table2excel(title, makeRankChart2TableHTML(data) );
     	// $('#processLoading').hide();
 		closeMessage();
 	});
@@ -288,7 +259,7 @@ function excelSales(index, apt) {
 
     //$('#processLoading').show();
 	showMessage();
-	$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+apt, function(jsonData){
+	$.getJSON(getChartURL('getAptSale', { 'apt': apt }), function(jsonData){
 		data = JSON.parse(jsonData);
 		var html = "<tr>";
 		html += "<th>거래일</th>";
@@ -368,6 +339,36 @@ function setLineThick(index, thick, recursive) {
 	myChart.update();
 }
 
+function getChartURL(urlName, params) {
+
+	var url = "{{ config['BASE_URL'] }}" + urlName + "?"
+
+	for (const key in params) {
+		var value = params[key];
+		if (value == null) value = '';
+		url += key + "=" + value + "&";
+	}
+
+	return url;
+
+}
+
+function getConditionParam(params, param, defaultValue = null) {
+	
+	var value = params[param];
+	if (value == null) {
+		if (defaultValue != null) {
+			value = defaultValue;
+			params[param] = value;
+		} else {
+			value = '';
+		}
+	}
+
+	return value;
+
+}
+
 function drawLegend(chart) {
 
 	var text = []; 
@@ -385,8 +386,9 @@ function drawLegend(chart) {
 		text.push("<input type=button title='숨기기' class='chart-btn chart-btn-hide' onclick='hideChart($(this), "+i+");' />");
 		text.push("<input type=button title='삭제' class='chart-btn chart-btn-del' onclick='delChart("+i+");' />");
 		text.push("<input type=button title='엑셀' class='chart-btn chart-btn-excel' onclick='excelChart("+i+");' />");
-		if (data.apt != undefined) {
-			text.push("<input type=button title='거래내역엑셀' class='chart-btn chart-btn-excel' onclick='excelSales("+i+","+data.apt+");' />");
+		const apt = data.params['apt'];
+		if (apt != undefined) {
+			text.push("<input type=button title='거래내역엑셀' class='chart-btn chart-btn-excel' onclick='excelSales("+i+","+apt+");' />");
 		}
 		j++;
 	}
@@ -424,45 +426,80 @@ function createChart(title, labels, type, func) {
 		var activePoint = myChart.getElementAtEvent(event);
 
 		// make sure click was on an actual point
-		if (activePoint.length > 0) {
-			var clickedDatasetIndex = activePoint[0]._datasetIndex;
-			var clickedDataIndex = activePoint[0]._index;
-			var key = myChart.data.datasets[clickedDatasetIndex].label;
-			var chart = gChartData.get(key);
+		if (activePoint.length == 0)
+			return;
 
-			var label = myChart.data.labels[activePoint[0]._index];
-			if (chart && chart.apt) {
-				$.getJSON("{{ config['BASE_URL'] }}getAptSale?apt="+chart.apt+"&ym="+label, function(jsonData){
+		var clickedDatasetIndex = activePoint[0]._datasetIndex;
+		var clickedDataIndex = activePoint[0]._index;
+		var key;
+		if (gChartArea != '') // If Rank Chart
+			key = myChart.data.datasets[0].label; // key is always 1st chart
+		else
+			// else key is clicked chart
+			key = myChart.data.datasets[clickedDatasetIndex].label;
+		var chartData = gChartData.get(key);
+		if (chartData == null) {
+			for(var i = clickedDatasetIndex; i >= 0; i--) {
+				if (key.startsWith(myChart.data.datasets[i].label)) {
+					chartData = gChartData.get(myChart.data.datasets[i].label);
+					if (chartData != null) {
+						break;
+					}
+				}
+			}
+			if (chartData == null)
+				return;
+		}
+
+		var label = myChart.data.labels[activePoint[0]._index];
+		if (gChartArea != '') { // if Rank Chart
+			base_ym = chartData.params['base_ym'];
+			years = chartData.params['years'];
+			let yy = parseInt(base_ym.substr(0,4)) - parseInt(years) - 1;
+			let mm = parseInt(base_ym.substr(4,2));
+			if (mm == 12) {
+				yy++;
+				mm = 1;
+			} else
+				mm++;
+			var from_ym = '' + yy + (mm < 10 ? "0"+mm : mm);
+			region = chartData.data['region'][clickedDataIndex];
+			chartData.params['danji'] = 'N';
+			chartData.params['region'] = region;
+			chartData.params['from_ym'] = from_ym;
+			chartData.params['to_ym'] = chartData.params['base_ym'];
+			switch(gChartArea) {
+			case 'Region':
+				drawSaleStat(chartData.params, label);
+				break;
+			case 'Dong':
+				chartData.params['dong'] = chartData.data['dong'][clickedDataIndex];
+				drawSaleStat(chartData.params, label);
+				break;
+			case 'Apt':
+				chartData.params['apt'] = chartData.data['apt'][clickedDataIndex];
+				drawSaleLineChart(chartData.params, label);
+			}
+		} else {
+			if (chartData.params['apt']) {
+				chartData.params['ym'] = label;
+				$.getJSON(getChartURL('getAptSale', chartData.params), function(jsonData){
 					data = JSON.parse(jsonData);
 					showAptSaleTable(evt, data);
 				});
-				return;
 			} else {
-				if (myChart.gubun != undefined) {
-					var data = gChartData.get('Data');
-						let yy = parseInt(myChart.base_ym.substr(0,4)) - parseInt(myChart.years) - 1;
-						let mm = parseInt(myChart.base_ym.substr(4,2));
-						if (mm == 12) {
-							yy++;
-							mm = 1;
-						} else
-							mm++;
-						var from_ym = '' + yy + (mm < 10 ? "0"+mm : mm);
-						to_ym = myChart.base_ym;
-						region = data['region'][clickedDataIndex];
-					switch(myChart.gubun) {
-					case 'Region':
-						drawSaleStat('N', from_ym, to_ym, myChart.ages, myChart.age_sign, myChart.area_type, region, '', label);
-						break;
-					case 'Dong':
-						dong = data['dong'][clickedDataIndex];
-						drawSaleStat('N', from_ym, to_ym, myChart.ages, myChart.age_sign, myChart.area_type, region, dong, label);
-						break;
-					case 'Apt':
-						apt = data['apt'][clickedDataIndex];
-						drawSaleLineChart(apt, label, from_ym, to_ym, myChart.area_type);
-					}
+				let gubun = '';
+				if (chartData.params['region'] == '11000' || chartData.params['region'] == '') {
+					gubun = 'Region';
+				} 
+				if (chartData.params['dong'] == '00000' || chartData.params['dong'] == '') {
+					if (gubun == '')
+						gubun = 'Dong';
 				}
+				if (gubun == '')
+					gubun = 'Apt';
+				chartData.params['base_ym'] = label;
+				drawRankChart(gubun, chartData.params);
 			}
 		}
 		$("#aptSaleDiv").hide();
@@ -476,6 +513,7 @@ function clearChart() {
     myChart = null;
   }
   gChartData.clear();
+  gChartArea = '';
 
 }
 
@@ -579,10 +617,7 @@ function updateChart() {
 	// 보관하고 있는 원래의 데이터로 다시 차트를 그린다
 	for(let key of gChartData.keys()) {
 		var chart = gChartData.get(key);
-		var data = Object.values(chart.data);
-		var volume_data = (chart.volume_data == null ? null : Object.values(chart.volume_data));
-		var ma_data = (chart.ma_data == null ? null : Object.values(chart.ma_data));
-		drawChart(key, chart.labels, data, chart.apt, volume_data, ma_data);
+		drawChart(key, chart.labels, chart.data);
 	}
 }
 
@@ -622,33 +657,37 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 	myChart['data']['datasets'].push(dataset);
 }
 
-function drawChart(title, labels, data, apt, volume_data, ma_data){
+function drawChart(title, labels, data){
+
+	const mainData = data['data'];
+	const volumeData = data['cnt'];
+	const maData = data['ma'];
 
 	// 상대수치로 그리기 라면
 	if (draw_options['draw_relative']) {
 		// null이 아닌 첫번째 데이터를 찾아서
 		var base_pos = -1;
-		while (data[base_pos] == null && base_pos < data.length) {
+		while (data[base_pos] == null && base_pos < mainData.length) {
 			base_pos++;
 		}
 		makeRelativeData(base_pos, data);
-		if (draw_options['draw_ma'] && ma_data != null)
-			makeRelativeData(base_pos, ma_data);
+		if (draw_options['draw_ma'] && maData != null)
+			makeRelativeData(base_pos, maData);
 	}
 
-	makeChartDataset('line', title, 'A', data, 'red');
+	makeChartDataset('line', title, 'A', mainData, 'red');
 
 	// 6개월 이동평균으로 그리기
-	if (draw_options['draw_ma'] && ma_data != null) {
-		makeChartDataset('line', title + "(1YR)", 'A', ma_data, 'blue');
+	if (draw_options['draw_ma'] && maData != null) {
+		makeChartDataset('line', title + "(1YR)", 'A', maData, 'blue');
 	}
 
 	// 거래량 같이 그리기
-	if (draw_options['draw_volume'] && volume_data) {
+	if (draw_options['draw_volume'] && volumeData) {
 		if (myChart['options']['scales']['yAxes'].length == 1)
 			addRightYAxe();
 
-		makeChartDataset('bar', title + "(거래건수)", 'B', volume_data, 'yellow');
+		makeChartDataset('bar', title + "(거래건수)", 'B', volumeData, 'yellow');
 	}
 
 	$('#chartLegend').html(myChart.generateLegend()); 
@@ -657,7 +696,12 @@ function drawChart(title, labels, data, apt, volume_data, ma_data){
 
 }
 
-function drawNewChart(title, labels, data, apt, volume_data, ma_data){
+function drawNewChart(title, labels, data, params){
+
+	const mainData = data['data'];
+	const volumeData = data['cnt'];
+	const maData = data['ma'];
+
 	$("#draw_options > input:checkbox").attr("disabled",false);
 	// 팡업 화면을 숨긴다
 	$("#aptSaleDiv").hide();
@@ -676,25 +720,24 @@ function drawNewChart(title, labels, data, apt, volume_data, ma_data){
 	// 기존에 그려진 차트가 있으면
 	if (myChart['data']['datasets'].length > 0) {
 		// 새 데이터와 기존 데이터의 X 라벨의 From~To를 맞춰준다
-		spreadLabels(labels, data, volume_data);
+		spreadLabels(labels, mainData, volumeData);
 	}
 
 	// 전역변수에 차트 데이터를 저장한다
 	gChartData.set(title, {
 		labels : $.extend({}, labels),
 		data : $.extend({}, data),
-		volume_data : (volume_data ? $.extend({}, volume_data) : null), // 거래량 데이터
-		ma_data : (ma_data ? $.extend({}, ma_data) : null), // 6개월 이동평균 데이터
-		apt : apt // 아파트ID
+		params : params    
 	});
 
 	// 차트용 데이터를 구성하고 차트를 그린다
-	drawChart(title, labels, data, apt, volume_data, ma_data);
+	drawChart(title, labels, data);
 
 }
 
-function drawSaleLineChart(apt, title, from_ym, to_ym, area_type) {
+function drawSaleLineChart(params, title) {
 
+	const apt = params['apt']
 	if (apt == undefined || apt == "") {
 		alert('아파트가 선택도지 않았습니다.');
 		return;
@@ -704,23 +747,111 @@ function drawSaleLineChart(apt, title, from_ym, to_ym, area_type) {
 		return;
 	}
 
+	title = makeChartConditionTitle(title, params, {'danji':true, 'ages':true, 'age_sign':true});
+
   if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
 
+	var url = getChartURL('getSale', params);
+
   //$('#processLoading').show();
   showMessage();
-  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt+"&from_ym="+from_ym+"&to_ym="+to_ym+"&area_type="+area_type, function(jsonData){
+//  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt+"&from_ym="+from_ym+"&to_ym="+to_ym+"&area_type="+area_type, function(jsonData){
+  $.getJSON(url, function(jsonData){
     data = JSON.parse(jsonData);
-    drawNewChart(title, data['labels'], data['data'], apt, data['cnt'], data['maData']);
+    drawNewChart(title, data['labels'], data, params);
   	//$('#processLoading').hide();
 	closeMessage();
   });
 
 }
 
-function drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
+function makeChartConditionTitle(title, params, toIgnoreParams = []) {
+
+
+	// check if any param exists
+	var existsParams = false;
+	for(const key in params) {
+		// ignore if region/dong params
+		if (key == 'region' || key == 'dong')
+			continue;
+		if (params[key] != '' && !toIgnoreParams[key]) {
+			existsParams = true;
+			break;
+		}
+	}
+
+	// if no param, just return title
+  	if (!existsParams)
+  		return title;
+
+	var needsComma = false;
+    title += " (";
+	if (!toIgnoreParams['danji']) {
+		const danji = getConditionParam(params, 'danji', 'N');
+    	if (danji == "Y"){
+      		title += "등록된 단지만";
+    	} else {
+      		title += "모든 실거래";
+    	}
+		needsComma = true;
+	}
+	if (!toIgnoreParams['from_ym'] && !toIgnoreParams['to_ym']) {
+		const from_ym = getConditionParam(params, 'from_ym');
+		const to_ym = getConditionParam(params, 'to_ym');
+    	if (from_ym + to_ym != ""){
+			if (needsComma) title += ", ";
+			else needsComma = true;
+      		title += "기간 : " + from_ym + " ~ " + to_ym;
+    	}
+	}
+	if (!toIgnoreParams['ages'] && !toIgnoreParams['age_sign']) {
+		const ages = getConditionParam(params, 'ages');
+		const age_sign = getConditionParam(params, 'age_sign');
+    	if (ages != '' && age_sign != ''){
+			if (needsComma) title += ", ";
+			else needsComma = true;
+      		title += "연식 : " + ages + " 년 " + (age_sign == '<' ? "이내" : "이상");
+    	}
+	}
+	if (!toIgnoreParams['area_type']) {
+		const area_type = getConditionParam(params, 'area_type');
+    	if (area_type != ""){
+			if (needsComma) title += ", ";
+			else needsComma = true;
+      		title += "전용면적 : ";
+      		pos = 0;
+      		do {
+        		if (pos > 0) title += "|";
+        		switch (area_type.substr(pos, 2)) {
+          		case "01":
+            		title += "~60";
+            		break;
+          		case "02":
+            		title += "60~85";
+            		break;
+          		case "03":
+            		title += "85~135";
+            		break;
+          		case "04":
+            		title += "135~";
+            		break;
+        		}
+        		pos += 2;
+      		} while (area_type.length > pos);
+		}
+    }
+    title += ")";
+ 
+ 	return title;
+
+}
+
+//function drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
+function drawSaleStat(params, title) {
+/*
   params = "danji=" + danji;
   params += "&from_ym=" + from_ym;
   params += "&to_ym=" + to_ym;
@@ -729,69 +860,37 @@ function drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, 
   params += "&area_type=" + area_type;
   params += "&region=" + region;
   params += "&dong=" + dong;
-
-  if (danji + from_ym + to_ym + ages + area_type != "") {
-    title += " (";
-    if (danji == "Y"){
-      title += "등록된 단지만";
-    } else {
-      title += "모든 실거래";
-    }
-    if (from_ym + to_ym != ""){
-      title += ", 기간 : " + from_ym + " ~ " + to_ym;
-    }
-    if (ages != ""){
-      title += ", 연식 : " + ages + " 년 " + (age_sign == '<' ? "이내" : "이상");
-    }
-    if (area_type != ""){
-      title += ", 전용면적 : ";
-      pos = 0;
-      do {
-        if (pos > 0) title += "|";
-        switch (area_type.substr(pos, 2)) {
-          case "01":
-            title += "~60";
-            break;
-          case "02":
-            title += "60~85";
-            break;
-          case "03":
-            title += "85~135";
-            break;
-          case "04":
-            title += "135~";
-            break;
-        }
-        pos += 2;
-      } while (area_type.length > pos);
-
-    }
-    title += ")";
-  }
+*/
+	
+	title = makeChartConditionTitle(title, params);
 
   if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
 
+	var url = getChartURL('getSaleStat', params);
+
   //$('#processLoading').show();
   showMessage();
-  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
+//  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
+  $.getJSON(url, function(jsonData){
     data = JSON.parse(jsonData);
-    drawNewChart(title, data['labels'], data['data'], null, data['cnt'], data['ma']);
+    drawNewChart(title, data['labels'], data, params);
 	//$('#processLoading').hide();
 	closeMessage();
   });
 }
 
-const orderByOptions = [ ['rate', '상승율순 조회'], ['price', '기준가격순 조회'] ];
-
 function drawRankLegend(chart) {
 
 	var text = [];
 
+	var chartData = gChartData.get(chart.data.datasets[0].label);
+	var chartParams = chartData['params'];
+
 	text.push('<center>');
-	if (chart.hasPrior)
+	if (chartParams.hasPrior)
 		text.push("<span><a onclick='drawRankChartPage(false);'>◀&nbsp;&nbsp;</a></span>");
 
 	for (i = 0; i <chart.data.datasets.length; i++) { 
@@ -802,58 +901,105 @@ function drawRankLegend(chart) {
 		text.push('<span style="font-size:small;">' +chart.data.datasets[i].label + '</span>');
 	}
 	text.push("&nbsp;|&nbsp;");
-	text.push("<button class='chart-btn chart-btn-excel' onclick=\"redrawRankChart(" + ((myChart.orderby + 1) % 2) + ");\">");
-	text.push(orderByOptions[(myChart.orderby + 1) % 2][1] + "</button>");
+	var curOrderby = chartParams['orderby'];
+	text.push("<select id=rank_orderby class='chart-btn chart-btn-excel' onchange='redrawRankChart();'>");
+	gOrderByOptions.forEach(function(orderbyOption) {
+		text.push("<option value="+orderbyOption[0]+(curOrderby == orderbyOption[0] ? " selected":"") + ">"+orderbyOption[1]+"</option>");
+	});
+	text.push("</select>");
 	text.push("<button class='chart-btn chart-btn-excel' onclick='excelRankChart();'>엑셀 다운로드</button>");
-	if (chart.hasLater)
+	if (chartParams.hasLater)
 		text.push("<span><a onclick='drawRankChartPage(true);'>&nbsp;&nbsp;▶</a></span>");
 
 	text.push('</center>');
 	return text.join("");
 }
 
-function redrawRankChart(orderby) {
+function redrawRankChart() {
 	
-	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, myChart.ages, myChart.age_sign, myChart.area_type, orderby);
+	chartData = gChartData.get(myChart.data.datasets[0].label);
+
+	var selectedIndex = $('#rank_orderby option').index($('#rank_orderby option:selected'));
+	chartData.params['orderby'] = gOrderByOptions[selectedIndex][0];
+
+	chartData.params['page'] = 1;
+
+	drawRankChart(gChartArea, chartData.params);
 
 }
 
 function drawRankChartPage(next) {
 
-	var page = myChart.page;
+	
+	chartData = gChartData.get(myChart.data.datasets[0].label);
+	var page = chartData.params['page'];
 	if (next)
 		page += 1;
 	else
 		page -= 1;
-	drawRankChart(myChart.gubun, myChart.base_ym, myChart.years, myChart.region, myChart.dong, myChart.ages, myChart.age_sign, myChart.area_type, myChart.orderby, page);
+	chartData.params['page'] = page;
+
+	drawRankChart(gChartArea, chartData.params);
 		
 }
 
-function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
+function getCurYM() {
+	let today = new Date();   
+		
+	let year = today.getFullYear(); // 년도
+	let month = today.getMonth() + 1;
+	ym = year + "" + (month<10?"0"+month:month);
+
+	return ym;
+}
+
+//function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
+function drawRankChart(gubun, params) {
 	
 	$("#draw_options > input:checkbox").attr("disabled",true);
 	let title = '';
-	if (base_ym == "") {
-		let today = new Date();   
-		
-		let year = today.getFullYear(); // 년도
-		let month = today.getMonth() + 1;
-		base_ym = year + "" + (month<10?"0"+month:month);
+
+	const base_ym = getConditionParam(params, 'base_ym', getCurYM());
+	const years = getConditionParam(params, 'years', 1);
+
+	if (gubun == 'Region') {
+		title = '[' + $('select#region option:eq(0)').text() + ']';
+	} else if (gubun == 'Dong') {
+		title = '[' + $('select#region option:selected').text() + ']';
+	} else { // Apt
+		// $('select#region option:eq(0)').attr('selected') not working
+		if ($('select#region option').index($('select#region option:selected')) == 0) {
+			title = '[' + $('select#region option:eq(0)').text() + ']';
+		} else {
+			title = '[' + $('select#region option:selected').text();
+			if ($('select#dong option').index($('select#dong option:selected')) != 0) {
+				title += ' ' + $('select#dong option:selected').text();
+			}
+			title += ']';
+		}
 	}
+	
+	// if not exists, add & set default value for params - orderby & page
+	getConditionParam(params, 'orderby', gOrderByOptions[0][0]);
+	let page = getConditionParam(params, 'page', 1);
 
-	let url = getRankChartURL(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby, page);
+	let url = getRankChartURL(gubun, params);
 
+	var ignoreParams = {'from_ym':true, 'to_ym':true, 'orderby':true, 'page':true};
 	switch(gubun) {
 		case 'Region':
-			title = '구별 평단가 변동율';
+			title += '구별 평단가 변동율';
 			break;
 		case 'Dong':
-			title = '동별 평단가 변동율';
+			title += '동별 평단가 변동율';
 			break;
 		case 'Apt':
-			title = '아파트별 평단가 변동율';
+			title += '아파트별 평단가 변동율';
 			break;
 	}
+
+
+	title = makeChartConditionTitle(title, params, ignoreParams );
 
 	//$('#processLoading').show();
 	showMessage();
@@ -865,10 +1011,10 @@ function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area
 
 		clearChart();
 
-		let func = function(chart) { return drawRankLegend(chart); };
-		createChart(title, data['labels'], 'line', func);
+		gChartArea = gubun;
 
-		gChartData.set('Data', data);
+		createChart(title, data['labels'], 'line', function(chart) { return drawRankLegend(chart); });
+
 
 		myChart.options.tooltips.callbacks = {
         	beforeBody: function(tooltipItem, data) {
@@ -883,20 +1029,17 @@ function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area
 		};
 																																							    
 		if (page > 1)
-			myChart.hasPrior = true;
-		if (data['has_more'])
-			myChart.hasLater = true;
+			params['hasPrior'] = true;
+		else
+			params['hasPrior'] = false;
 
-		myChart.gubun = gubun;
-		myChart.base_ym = base_ym;
-		myChart.years = years;
-		myChart.page = page;
-		myChart.orderby = orderby;
-		myChart.region = region;
-		myChart.dong = dong;
-		myChart.ages = ages;
-		myChart.age_sign = age_sign;
-		myChart.area_type = area_type;
+		if (data['has_more'])
+			params['hasLater'] = true;
+		else
+			params['hasLater'] = false;
+
+		gChartArea = gubun;
+		gChartData.set(title, { 'data': data, 'params': params });
 
 		makeChartDataset('line', title, 'A', data['data']);
 
