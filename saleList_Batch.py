@@ -281,59 +281,32 @@ INSERT_APT_SALE_DELETED = """
 			   )
 """
 
-DELETE_APT_MA = "delete from apt_ma_new where ym = %s"
-DELETE_APT_REGION_MA = "delete from apt_region_ma_new where ym = %s"
+DELETE_APT_MA = "delete from apt_ma_new where ym between %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')"
+DELETE_APT_REGION_MA = "delete from apt_region_ma_new where ym %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')"
 
-INSERT_APT_SALE_MA = """
+INSERT_APT_MA = """
 	insert into apt_ma_new
 		select * from (
 			select a.apt_id, b.ym, a.area_type, round(avg(a.price/(a.area/3.3)), 2) unit_price, count(*) cnt
 			  from tmp_ym b
 				 , apt_sale_new a
 				 , apt_master_new c
-			 where b.ym = %s
+			 where b.ym between %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')
 			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
 			   and a.apt_id = c.id
 			 group by b.ym, a.apt_id, a.area_type
 		) a
 """
 
-INSERT_APT_STATS_MA = """
+INSERT_APT_REGION_MA = """
 	insert into apt_region_ma_new
 		select * 
 		  from (
     		select a.region, a.dong, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
 	      	  from tmp_ym b, apt_sale_stats_new a
-		 	 where b.ym = %s
+		 	 where b.ym between %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')
 		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
 		 	 group by b.ym, a.region, a.dong, a.danji_flag, a.made_year, a.area_type
-		  ) a
-"""
-
-INSERT_APT_STATS_MA_REGION = """
-	insert into apt_region_ma_new
-		select * 
-		  from (
-    		select a.region, '00000', a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
-	      	  from tmp_ym b, apt_sale_stats_new a
-		 	 where b.ym = %s
-			   and region != '11000'
-		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
-		 	 group by b.ym, a.region, a.danji_flag, a.made_year, a.area_type
-		  ) a
-"""
-
-INSERT_APT_STATS_MA_TOTAL = """
-	insert into apt_region_ma_new
-		select * 
-		  from (
-    		select '11000', '00000', a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
-	      	  from tmp_ym b, apt_sale_stats_new a
-		 	 where b.ym = %s
-			   and region != '11000'
-			   and dong = '00000'
-		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
-		 	 group by b.ym, a.region, a.danji_flag, a.made_year, a.area_type
 		  ) a
 """
 
@@ -447,29 +420,21 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, DELETE_APT_MA, (ym,))
+	rows = execute_dml(job_key, DELETE_APT_MA, (ym, ym))
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_SALE_MA, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_MA, (ym, ym))
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, DELETE_APT_REGION_MA, (ym,))
+	rows = execute_dml(job_key, DELETE_APT_REGION_MA, (ym, ym))
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_STATS_MA, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_REGION_MA, (ym, ym))
 	if rows < 0:
 		job_fail(job_key)
-
-#	rows = execute_dml(job_key, INSERT_APT_STATS_MA_REGION, (ym,))
-#	if rows < 0:
-#		job_fail(job_key)
-
-#	rows = execute_dml(job_key, INSERT_APT_STATS_MA_TOTAL, (ym,))
-#	if rows < 0:
-#		job_fail(job_key)
 
 	execute_dml(job_key, UPDATE_JOB_LOG_SUCCESS, (datetime.datetime.now().strftime('%Y%m%d%H%M%S'), get_cnt, ins_cnt, del_cnt, apt_cnt, job_key))
 
