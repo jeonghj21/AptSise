@@ -357,7 +357,7 @@ INSERT_APT_SALE_STATS_NEW_Y = """
 
 INSERT_APT_SALE_STATS_NEW_REGION = """
 	insert into apt_sale_stats_new
-		select region, '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), danji_flag
+		select region, '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), sum(cnt), danji_flag
 	 	  from apt_sale_stats_new a
 	 	 where a.ym = %s
 	 	 group by region, made_year, area_type, ym, danji_flag
@@ -365,7 +365,7 @@ INSERT_APT_SALE_STATS_NEW_REGION = """
 
 INSERT_APT_SALE_STATS_NEW_TOTAL = """
 	insert into apt_sale_stats_new
-		select '11000', '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), count(*), danji_flag
+		select '11000', '00000', made_year, area_type, ym, (sum(unit_price * cnt) / sum(cnt)), sum(cnt), danji_flag
 	 	  from apt_sale_stats_new a
 	 	 where a.ym = %s
 		   and dong = '00000'
@@ -463,13 +463,13 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_STATS_MA_REGION, (ym,))
-	if rows < 0:
-		job_fail(job_key)
+#	rows = execute_dml(job_key, INSERT_APT_STATS_MA_REGION, (ym,))
+#	if rows < 0:
+#		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_STATS_MA_TOTAL, (ym,))
-	if rows < 0:
-		job_fail(job_key)
+#	rows = execute_dml(job_key, INSERT_APT_STATS_MA_TOTAL, (ym,))
+#	if rows < 0:
+#		job_fail(job_key)
 
 	execute_dml(job_key, UPDATE_JOB_LOG_SUCCESS, (datetime.datetime.now().strftime('%Y%m%d%H%M%S'), get_cnt, ins_cnt, del_cnt, apt_cnt, job_key))
 
