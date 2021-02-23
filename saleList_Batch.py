@@ -282,7 +282,7 @@ INSERT_APT_SALE_DELETED = """
 """
 
 DELETE_APT_MA = "delete from apt_ma_new where ym between %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')"
-DELETE_APT_REGION_MA = "delete from apt_region_ma_new where ym %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')"
+DELETE_APT_REGION_MA = "delete from apt_region_ma_new where ym between %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')"
 
 INSERT_APT_MA = """
 	insert into apt_ma_new
