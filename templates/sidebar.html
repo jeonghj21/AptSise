@@ -3,10 +3,10 @@
 var gRegionsMap = {};
 var gDongsMap = {};
 var gAptMap = {};
-var draw_options = {};
+var gDrawOptions = {};
 
 function setDrawOption(checkbox) {
-	draw_options[checkbox.id] = checkbox.checked;
+	gDrawOptions[checkbox.id] = checkbox.checked;
 }
 
 function constructSel(sel, data, allTitle, allValue) {
@@ -317,7 +317,7 @@ function closeMessage() {
 		<label><strong>평균평단가 추이</strong></label><br>
 		<button id='region_btn' onclick="requestSaleStat();">구/동별 평균평단가 추이</button>
 		<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
-		<div id="draw_options">
+		<div id="gDrawOptions">
 			<label><strong>차트 옵션</strong></label><br>
 			<input id=draw_overlap type=checkbox onchange="setDrawOption(this);">겹쳐 그리기</input><br>
 			<input id=draw_relative type=checkbox onchange="setDrawOption(this); updateChart();">상대수치로 보기</input><br>
@@ -351,24 +351,29 @@ function closeMessage() {
 </table>
 </div>
 <script>
+const MIN_YY = 2006;
 $(document).ready(function(){ 
 	var today = new Date();
-	var ym = today.getFullYear() * 100 + today.getMonth()+1;
-	for(var y = 2006; y < ym / 100; y++) {
+	var yy = today.getFullYear();
+	var mm = today.getMonth()+1;
+	var to_ym = yy * 100 + mm;
+	// from_ym set to 3 years minus one month ago
+	var from_ym = (mm == 12 ? (yy - 2) * 100 + 1 : (yy - 3) * 100 + mm + 1);
+	for(var y = MIN_YY; y < to_ym / 100; y++) {
 		var html = "<tr>";
 		for(var m = 1; m <= 12; m++) {
-			html += "<td class=one_ym>" + (y*100+m <= ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
+			html += "<td class=one_ym>" + (y*100 + m <= to_ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
 		}
 		html += "</tr>:"
 		$('#ym_table_asc > tbody:last').append(html);
 	};
-	$('input#from_ym').val('200601');
-	$('input#to_ym').val(ym);
-	$('input#base_ym').val(ym);
-	for(var y = Number.parseInt(ym / 100); y >= 2006; y--) {
+	$('input#from_ym').val(from_ym);
+	$('input#to_ym').val(to_ym);
+	$('input#base_ym').val(to_ym);
+	for(var y = Number.parseInt(to_ym / 100); y >= MIN_YY; y--) {
 		var html = "<tr>";
 		for(var m = 1; m <= 12; m++) {
-			html += "<td class=one_ym>" + (y*100+m <= ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
+			html += "<td class=one_ym>" + (y*100 + m <= to_ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
 		}
 		html += "</tr>:"
 		$('#ym_table_desc > tbody:last').append(html);

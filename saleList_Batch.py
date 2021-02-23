@@ -234,7 +234,7 @@ INSERT_JOB_LOG = "insert into job_log values(%s, %s, %s, str_to_date(%s, '%Y%m%d
 
 INSERT_APT_MASTER_NEW = """
 	insert into apt_master_new 
-		select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도,null,'N' 
+		select null, 아파트, 법정동시군구코드,법정동읍면동코드,도로명코드,건축년도,null,null
 		  from tmp_raw_data2
 	 	 where (건축년도,법정동시군구코드,아파트)
 	 	   not in (select made_year, region, apt_name from apt_master_new)
@@ -318,6 +318,20 @@ INSERT_APT_STATS_MA_REGION = """
 	      	  from tmp_ym b, apt_sale_stats_new a
 		 	 where b.ym = %s
 			   and region != '11000'
+		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+		 	 group by b.ym, a.region, a.danji_flag, a.made_year, a.area_type
+		  ) a
+"""
+
+INSERT_APT_STATS_MA_TOTAL = """
+	insert into apt_region_ma_new
+		select * 
+		  from (
+    		select '11000', '00000', a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
+	      	  from tmp_ym b, apt_sale_stats_new a
+		 	 where b.ym = %s
+			   and region != '11000'
+			   and dong = '00000'
 		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
 		 	 group by b.ym, a.region, a.danji_flag, a.made_year, a.area_type
 		  ) a
@@ -425,11 +439,11 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_TOTAL, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_REGION, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
-	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_REGION, (ym,))
+	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_NEW_TOTAL, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 
@@ -446,6 +460,14 @@ for ym in YMs:
 		job_fail(job_key)
 
 	rows = execute_dml(job_key, INSERT_APT_STATS_MA, (ym,))
+	if rows < 0:
+		job_fail(job_key)
+
+	rows = execute_dml(job_key, INSERT_APT_STATS_MA_REGION, (ym,))
+	if rows < 0:
+		job_fail(job_key)
+
+	rows = execute_dml(job_key, INSERT_APT_STATS_MA_TOTAL, (ym,))
 	if rows < 0:
 		job_fail(job_key)
 

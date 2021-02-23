@@ -608,16 +608,16 @@ function updateChart() {
 	while(myChart['data']['datasets'].length > 0)
 		myChart['data']['datasets'].pop();
 
-	if (draw_options['draw_volume'] && myChart['options']['scales']['yAxes'].length == 1)
+	if (gDrawOptions['draw_volume'] && myChart['options']['scales']['yAxes'].length == 1)
 		addRightYAxe();
 
-	if (!draw_options['draw_volume'] && myChart['options']['scales']['yAxes'].length > 1)
+	if (!gDrawOptions['draw_volume'] && myChart['options']['scales']['yAxes'].length > 1)
 		removeRightYAxe();
 
 	// 보관하고 있는 원래의 데이터로 다시 차트를 그린다
 	for(let key of gChartData.keys()) {
 		var chart = gChartData.get(key);
-		drawChart(key, chart.labels, chart.data);
+		drawChart(key, chart.labels, chart.data, chart.chartOptions);
 	}
 }
 
@@ -637,17 +637,19 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 		type: chartType,
 		label: title,
 		yAxisID: yAxisID,
+/* not used in chart.js
 		pointColor: 'blue',
 		strokeColor: 'blue',
-		backgroundColor: getNextChartColor(),
+*/
 		data: data,
 		spanGaps: true
 	};
 	if (color)
 		dataset.thickColor = color;
 
-	if (chartType == 'line')
+	if (chartType == 'line') {
 		dataset.fill = false;
+	}
 
 	if (additionalParams)
 		Object.keys(additionalParams).forEach(function(key) { 
@@ -657,37 +659,51 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 	myChart['data']['datasets'].push(dataset);
 }
 
-function drawChart(title, labels, data){
+function drawChart(title, labels, data, chartOptions){
 
 	const mainData = data['data'];
 	const volumeData = data['cnt'];
 	const maData = data['ma'];
 
 	// 상대수치로 그리기 라면
-	if (draw_options['draw_relative']) {
+	if (gDrawOptions['draw_relative']) {
 		// null이 아닌 첫번째 데이터를 찾아서
 		var base_pos = -1;
 		while (data[base_pos] == null && base_pos < mainData.length) {
 			base_pos++;
 		}
 		makeRelativeData(base_pos, data);
-		if (draw_options['draw_ma'] && maData != null)
+		if (gDrawOptions['draw_ma'] && maData != null)
 			makeRelativeData(base_pos, maData);
 	}
 
-	makeChartDataset('line', title, 'A', mainData, 'red');
+	if (!chartOptions)
+		chartOptions = {};
 
-	// 6개월 이동평균으로 그리기
-	if (draw_options['draw_ma'] && maData != null) {
-		makeChartDataset('line', title + "(1YR)", 'A', maData, 'blue');
+	if (!chartOptions['backgroundColor']) {
+		var bgColor = Chart.defaults.global.defaultColor;
+		if (gDrawOptions['draw_overlap'])
+			bgColor = getNextChartColor();
+		chartOptions['backgroundColor'] = bgColor;
 	}
 
+	chartData = gChartData.get(title);
+	chartData['chartOptions'] = chartOptions;
+
+	makeChartDataset('line', title, 'A', mainData, 'red', chartOptions);
+
 	// 거래량 같이 그리기
-	if (draw_options['draw_volume'] && volumeData) {
+	if (gDrawOptions['draw_volume'] && volumeData) {
 		if (myChart['options']['scales']['yAxes'].length == 1)
 			addRightYAxe();
 
-		makeChartDataset('bar', title + "(거래건수)", 'B', volumeData, 'yellow');
+		makeChartDataset('bar', title + "(거래건수)", 'B', volumeData, 'yellow', chartOptions);
+	}
+
+	chartOptions['borderDash'] = [5, 15];
+	// 6개월 이동평균으로 그리기
+	if (gDrawOptions['draw_ma'] && maData != null) {
+		makeChartDataset('line', title + "(1YR)", 'A', maData, 'blue', chartOptions);
 	}
 
 	$('#chartLegend').html(myChart.generateLegend()); 
@@ -702,12 +718,12 @@ function drawNewChart(title, labels, data, params){
 	const volumeData = data['cnt'];
 	const maData = data['ma'];
 
-	$("#draw_options > input:checkbox").attr("disabled",false);
+	$("#gDrawOptions > input:checkbox").attr("disabled",false);
 	// 팡업 화면을 숨긴다
 	$("#aptSaleDiv").hide();
 
 	// 겹쳐 그리기 옵션이 아니면 기존 차트를 지운다
-	if (!draw_options['draw_overlap']) {
+	if (!gDrawOptions['draw_overlap']) {
 		clearChart();
 	}
 
@@ -749,7 +765,7 @@ function drawSaleLineChart(params, title) {
 
 	title = makeChartConditionTitle(title, params, {'danji':true, 'ages':true, 'age_sign':true});
 
-  if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
+  if (gDrawOptions['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
@@ -864,7 +880,7 @@ function drawSaleStat(params, title) {
 	
 	title = makeChartConditionTitle(title, params);
 
-  if (draw_options['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
+  if (gDrawOptions['draw_overlap'] && Array.from(gChartData.keys()).includes(title)) {
     alert("이미 있는 차트입니다.");
     return;
   }
@@ -956,7 +972,7 @@ function getCurYM() {
 //function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
 function drawRankChart(gubun, params) {
 	
-	$("#draw_options > input:checkbox").attr("disabled",true);
+	$("#gDrawOptions > input:checkbox").attr("disabled",true);
 	let title = '';
 
 	const base_ym = getConditionParam(params, 'base_ym', getCurYM());
