@@ -25,13 +25,13 @@ function setPopupPosition(event, popup) {
 	    mousePosition.y = event.pageY; 
 
 	    if (mousePosition.x + menuDimension.x > $(window).width() + $(window).scrollLeft()) { 
-	        popupPosition.x = mousePosition.x - menuDimension.x; 
+	        popupPosition.x = Math.max(mousePosition.x - menuDimension.x, 10);
 	    } else { 
 	    	popupPosition.x = mousePosition.x; 
 	    } 
 
 	    if (mousePosition.y + menuDimension.y > $(window).height() + $(window).scrollTop()) { 
-	         popupPosition.y = mousePosition.y - menuDimension.y; 
+	         popupPosition.y = Math.max(mousePosition.y - menuDimension.y, 10); 
 	    } else { 
 	    	popupPosition.y = mousePosition.y; 
 	    } 
@@ -64,24 +64,25 @@ function resetChartColor() {
 }
 
 function showAptSaleTable(event, data) {
-  $('#aptSaleTable > tbody:last').empty();
-  $.each(data, function(idx, r) {
-	  var area = parseFloat(r[1]);
-	  var price = parseInt(r[3].replace(/,/g,""));
-	  var unit_price = (price / (area/3.3)).toFixed(1);
-	  unit_price = unit_price.toString().replace(/(\d)(?=(?:\d{3})+(?!\d))/g, "$1,");
-	  var html = '<tr class=aptSaleListLine>';
-	  html += "<td class=aptSaleListItem style='text-align: center;'>" + r[0] + '</td>';
-	  html += "<td class=aptSaleListItem style='text-align: right;'>" + r[1] + ' (' + (area/3.3).toFixed(1) + '평)</td>';
-	  html += "<td class=aptSaleListItem style='text-align: center;'>" + r[2] + '</td>';
-	  html += "<td class=aptSaleListItem style='text-align: right;'>" + r[3] + '</td>';
-	  html += "<td class=aptSaleListItem style='text-align: right;'>" + unit_price + '</td>';
-	  html += "</tr>";
-	  $('#aptSaleTable > tbody:last').append(html);
-  });
-  var div = $("#aptSaleDiv");
-  var pos = setPopupPosition(event, div);
-  div.css({top: pos.y+'px', left: pos.x+'px', display: 'block'});
+
+	$('#aptSaleTable > tbody:last').empty();
+	$.each(data, function(idx, r) {
+		var area = parseFloat(r[1]);
+		var price = parseInt(r[3].replace(/,/g,""));
+		var unit_price = (price / (area/3.3)).toFixed(1);
+		unit_price = unit_price.toString().replace(/(\d)(?=(?:\d{3})+(?!\d))/g, "$1,");
+		var html = '<tr class=aptSaleListLine>';
+		html += "<td class=aptSaleListItem style='text-align: center;'>" + r[0] + '</td>';
+		html += "<td class=aptSaleListItem style='text-align: right;'>" + r[1] + ' (' + (area/3.3).toFixed(1) + '평)</td>';
+		html += "<td class=aptSaleListItem style='text-align: center;'>" + r[2] + '</td>';
+		html += "<td class=aptSaleListItem style='text-align: right;'>" + r[3] + '</td>';
+		html += "<td class=aptSaleListItem style='text-align: right;'>" + unit_price + '</td>';
+		html += "</tr>";
+		$('#aptSaleTable > tbody:last').append(html);
+	});
+	var div = $("#aptSaleDiv");
+	var pos = setPopupPosition(event, div);
+	div.css({top: pos.y+'px', left: pos.x+'px', display: 'block'});
 }
 
 function addRightYAxe(additionalParams) {
@@ -203,12 +204,10 @@ function excelRankChart() {
 
 	url = getRankChartURL(gChartArea, chartData.params);
 
-    // $('#processLoading').show();
 	showMessage();
 	$.getJSON(url, function(jsonData){
 		data = JSON.parse(jsonData);
 		table2excel(title, makeRankChart2TableHTML(data) );
-    	// $('#processLoading').hide();
 		closeMessage();
 	});
 }
@@ -257,7 +256,6 @@ function excelSales(index, apt) {
 
 	var title = myChart.data.datasets[index].label;
 
-    //$('#processLoading').show();
 	showMessage();
 	$.getJSON(getChartURL('getAptSale', { 'apt': apt }), function(jsonData){
 		data = JSON.parse(jsonData);
@@ -284,7 +282,6 @@ function excelSales(index, apt) {
 			html += "</tr>";
 		});
 		table2excel(title+'(거래목록)', html);
-    	//$('#processLoading').hide();
 		closeMessage();
 	});
 }
@@ -343,7 +340,7 @@ function getChartURL(urlName, params) {
 
 	var url = "{{ config['BASE_URL'] }}" + urlName + "?"
 
-	for (const key in params) {
+	for (const key in params.params) {
 		var value = params[key];
 		if (value == null) value = '';
 		url += key + "=" + value + "&";
@@ -356,7 +353,7 @@ function getChartURL(urlName, params) {
 function getConditionParam(params, param, defaultValue = null) {
 	
 	var value = params[param];
-	if (value == null) {
+	if (value == null || value == '') {
 		if (defaultValue != null) {
 			value = defaultValue;
 			params[param] = value;
@@ -430,29 +427,33 @@ function createChart(title, labels, type, func) {
 			return;
 
 		var clickedDatasetIndex = activePoint[0]._datasetIndex;
-		var clickedDataIndex = activePoint[0]._index;
 		var key;
 		if (gChartArea != '') // If Rank Chart
 			key = myChart.data.datasets[0].label; // key is always 1st chart
 		else
 			// else key is clicked chart
 			key = myChart.data.datasets[clickedDatasetIndex].label;
-		var chartData = gChartData.get(key);
-		if (chartData == null) {
+
+		var originChartData = gChartData.get(key);
+		if (originChartData == null) {
 			for(var i = clickedDatasetIndex; i >= 0; i--) {
 				if (key.startsWith(myChart.data.datasets[i].label)) {
-					chartData = gChartData.get(myChart.data.datasets[i].label);
-					if (chartData != null) {
+					originChartData = gChartData.get(myChart.data.datasets[i].label);
+					if (originChartData != null) {
 						break;
 					}
 				}
 			}
-			if (chartData == null)
+			if (originChartData == null)
 				return;
 		}
 
-		var label = myChart.data.labels[activePoint[0]._index];
-		if (gChartArea != '') { // if Rank Chart
+		// leave origin data unchanged
+		let chartData = $.extend(originChartData);
+
+		var clickedDataIndex = activePoint[0]._index;
+		var label = myChart.data.labels[clickedDataIndex];
+		if (gChartArea != '') { // if Current Chart is Rank Chart
 			base_ym = chartData.params['base_ym'];
 			years = chartData.params['years'];
 			let yy = parseInt(base_ym.substr(0,4)) - parseInt(years) - 1;
@@ -463,8 +464,7 @@ function createChart(title, labels, type, func) {
 			} else
 				mm++;
 			var from_ym = '' + yy + (mm < 10 ? "0"+mm : mm);
-			region = chartData.data['region'][clickedDataIndex];
-			chartData.params['danji'] = 'N';
+			var region = chartData.data['region'][clickedDataIndex];
 			chartData.params['region'] = region;
 			chartData.params['from_ym'] = from_ym;
 			chartData.params['to_ym'] = chartData.params['base_ym'];
@@ -477,11 +477,12 @@ function createChart(title, labels, type, func) {
 				drawSaleStat(chartData.params, label);
 				break;
 			case 'Apt':
+				chartData.params['dong'] = chartData.data['dong'][clickedDataIndex];
 				chartData.params['apt'] = chartData.data['apt'][clickedDataIndex];
 				drawSaleLineChart(chartData.params, label);
 			}
 		} else {
-			if (chartData.params['apt']) {
+			if (chartData.params['apt'] != '') {
 				chartData.params['ym'] = label;
 				$.getJSON(getChartURL('getAptSale', chartData.params), function(jsonData){
 					data = JSON.parse(jsonData);
@@ -489,15 +490,15 @@ function createChart(title, labels, type, func) {
 				});
 			} else {
 				let gubun = '';
+				// If no region, it's region rank chart
 				if (chartData.params['region'] == '11000' || chartData.params['region'] == '') {
 					gubun = 'Region';
-				} 
-				if (chartData.params['dong'] == '00000' || chartData.params['dong'] == '') {
-					if (gubun == '')
-						gubun = 'Dong';
-				}
-				if (gubun == '')
+				// If no dong, it's dong rank chart
+				} else if (chartData.params['dong'] == '00000' || chartData.params['dong'] == '') {
+					gubun = 'Dong';
+				} else {
 					gubun = 'Apt';
+				}
 				chartData.params['base_ym'] = label;
 				drawRankChart(gubun, chartData.params);
 			}
@@ -637,10 +638,6 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 		type: chartType,
 		label: title,
 		yAxisID: yAxisID,
-/* not used in chart.js
-		pointColor: 'blue',
-		strokeColor: 'blue',
-*/
 		data: data,
 		spanGaps: true
 	};
@@ -694,16 +691,18 @@ function drawChart(title, labels, data, chartOptions){
 
 	// 거래량 같이 그리기
 	if (gDrawOptions['draw_volume'] && volumeData) {
-		if (myChart['options']['scales']['yAxes'].length == 1)
-			addRightYAxe();
+		if (myChart['options']['scales']['yAxes'].length > 1)
+			removeRightYAxe();
+		addRightYAxe();
 
 		makeChartDataset('bar', title + "(거래건수)", 'B', volumeData, 'yellow', chartOptions);
 	}
 
-	chartOptions['borderDash'] = [5, 15];
 	// 6개월 이동평균으로 그리기
 	if (gDrawOptions['draw_ma'] && maData != null) {
+		chartOptions['borderDash'] = [5, 15];
 		makeChartDataset('line', title + "(1YR)", 'A', maData, 'blue', chartOptions);
+		delete chartOptions['borderDash'];
 	}
 
 	$('#chartLegend').html(myChart.generateLegend()); 
@@ -755,11 +754,11 @@ function drawSaleLineChart(params, title) {
 
 	const apt = params['apt']
 	if (apt == undefined || apt == "") {
-		alert('아파트가 선택도지 않았습니다.');
+		alert('아파트가 선택되지 않았습니다.');
 		return;
 	}
 	if (title == undefined || title == "") {
-		alert('아파트가 선택도지 않았습니다.');
+		alert('아파트가 선택되지 않았습니다.');
 		return;
 	}
 
@@ -772,13 +771,10 @@ function drawSaleLineChart(params, title) {
 
 	var url = getChartURL('getSale', params);
 
-  //$('#processLoading').show();
   showMessage();
-//  $.getJSON("{{ config['BASE_URL'] }}getSale?apt="+apt+"&from_ym="+from_ym+"&to_ym="+to_ym+"&area_type="+area_type, function(jsonData){
   $.getJSON(url, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data, params);
-  	//$('#processLoading').hide();
 	closeMessage();
   });
 
@@ -789,7 +785,7 @@ function makeChartConditionTitle(title, params, toIgnoreParams = []) {
 
 	// check if any param exists
 	var existsParams = false;
-	for(const key in params) {
+	for(const key in params.params) {
 		// ignore if region/dong params
 		if (key == 'region' || key == 'dong')
 			continue;
@@ -865,18 +861,7 @@ function makeChartConditionTitle(title, params, toIgnoreParams = []) {
 
 }
 
-//function drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title) {
 function drawSaleStat(params, title) {
-/*
-  params = "danji=" + danji;
-  params += "&from_ym=" + from_ym;
-  params += "&to_ym=" + to_ym;
-  params += "&ages=" + ages;
-  params += "&age_sign=" + age_sign;
-  params += "&area_type=" + area_type;
-  params += "&region=" + region;
-  params += "&dong=" + dong;
-*/
 	
 	title = makeChartConditionTitle(title, params);
 
@@ -887,13 +872,10 @@ function drawSaleStat(params, title) {
 
 	var url = getChartURL('getSaleStat', params);
 
-  //$('#processLoading').show();
   showMessage();
-//  $.getJSON("{{ config['BASE_URL'] }}getSaleStat?" + params, function(jsonData){
   $.getJSON(url, function(jsonData){
     data = JSON.parse(jsonData);
     drawNewChart(title, data['labels'], data, params);
-	//$('#processLoading').hide();
 	closeMessage();
   });
 }
@@ -969,7 +951,6 @@ function getCurYM() {
 	return ym;
 }
 
-//function drawRankChart(gubun, base_ym, years, region, dong, ages, age_sign, area_type, orderby = 0, page = 1) {
 function drawRankChart(gubun, params) {
 	
 	$("#gDrawOptions > input:checkbox").attr("disabled",true);
@@ -983,8 +964,7 @@ function drawRankChart(gubun, params) {
 	} else if (gubun == 'Dong') {
 		title = '[' + $('select#region option:selected').text() + ']';
 	} else { // Apt
-		// $('select#region option:eq(0)').attr('selected') not working
-		if ($('select#region option').index($('select#region option:selected')) == 0) {
+		if (!gRegionsMap[params['region']]) {
 			title = '[' + $('select#region option:eq(0)').text() + ']';
 		} else {
 			title = '[' + $('select#region option:selected').text();
@@ -1017,7 +997,6 @@ function drawRankChart(gubun, params) {
 
 	title = makeChartConditionTitle(title, params, ignoreParams );
 
-	//$('#processLoading').show();
 	showMessage();
 	$.getJSON(url, function(jsonData){
 		data = JSON.parse(jsonData);
@@ -1079,7 +1058,6 @@ function drawRankChart(gubun, params) {
 		$('#chartLegend').html(myChart.generateLegend()); 
 		myChart.update();
 		
-		//$('#processLoading').hide();
 		closeMessage();
 
 	});

@@ -78,6 +78,80 @@ function refreshApt() {
 
 function getChartConditions() {
 
+	var params = {};
+
+	$('#chart_conditions input, #chart_conditions select').each(function(index, item) {
+		input = $(item);
+		key = input.attr('id');
+		if (params[key]) {
+			tmp = params[key];
+			if (!Array.isArray(tmp)) {
+				params[key] = [ tmp ];
+				params[key].value_len = input.val().length;
+			}
+			params[key].push(input);
+		} else
+			params[key] = input;
+	});
+
+	params['orderby'] = '';
+	params['page'] = '';
+	params['ym'] = '';
+
+	var map = { params: params };
+
+	Object.keys(params).forEach(function(key) {
+
+		var item = params[key];
+		var input = item;
+		if (Array.isArray(item))
+			input = item[0];
+
+		Object.defineProperty(map, key,
+		{ get: function () { 
+			var input = this.params[key];
+			if (Array.isArray(input)) {
+				if (input.length == $('#chart_conditions #'+key).length)
+					return '';
+				else { 
+					var value = '';
+					input.forEach(function(item) {
+						value += item.val();
+					});
+					return value;
+				}
+			} else if (typeof input == "string" || typeof input == "number") {
+				return input;
+			} else {
+				// skip if no input, not checked
+				if (input.val() == null || (input.attr('type') == 'checkbox' && !input.is(':checked')))
+					return '';
+				return input.val();
+			}
+		}, set: function(newValue) {
+			var input = this.params[key];
+			if (Array.isArray(input)) {
+				var pos = 0;
+				input.forEach(function(item) {
+					if(item.val() == newValue.substring(pos, pos+input.value_len)) {
+						item.prop("checked", true);
+					}
+					pos += input.value_len;
+				});
+			} else if (typeof input == "string" || typeof input == "number") {
+				this.params[key] = newValue;
+			} else {
+				input.val(newValue).change();
+			}
+		}});
+	});
+
+	return map;
+
+}
+/*
+function getChartConditions() {
+
 	params = {};
 	dup_params = {};
 
@@ -110,30 +184,11 @@ function getChartConditions() {
 	return params;
 
 }
-
+*/
 function requestSaleStat() {
 
-/*
-	var danji = $('input#danji').is(":checked") ? "Y" : "N";
-	var from_ym = $('input#from_ym').val();
-	var to_ym = $('input#to_ym').val();
-	var ages = $('select#ages').val();
-	var age_sign = $('select#age_sign').val();
-  
-	var area_type = "";
-	var checkboxes = $('input#area_type');
-	for(var i = 0; i < checkboxes.length; i++) {
-		if (checkboxes[i].checked)
-			area_type += checkboxes[i].value;
-	}
-	if (area_type.length == checkboxes.length * 2)
-		area_type = "";
-
-	var region = $('select#region').val();
-	var dong = $('select#dong').val();
-*/
-
 	var params = getChartConditions();
+	//var params = getForm2Map();
 
 	var title;
 	if ($("select#dong")[0].selectedIndex <= 0) {
@@ -142,7 +197,6 @@ function requestSaleStat() {
 		title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
 	}
 
-//	drawSaleStat(danji, from_ym, to_ym, ages, age_sign, area_type, region, dong, title);
 	// delete unnecessary parameter 'apt' for region stat
 	delete params['apt'];
 	drawSaleStat(params, title);
@@ -151,60 +205,17 @@ function requestSaleStat() {
 
 function requestSaleLine() {
 
-/*
-	var from_ym = $('input#from_ym').val();
-	var to_ym = $('input#to_ym').val();
-  
-	var area_type = "";
-	var checkboxes = $('input#area_type');
-	for(var i = 0; i < checkboxes.length; i++) {
-		if (checkboxes[i].checked)
-			area_type += checkboxes[i].value;
-	}
-	if (area_type.length == checkboxes.length * 2)
-		area_type = "";
-
-	var apt = $('select#apt option:selected').val();
-	
-*/
-
 	var title = $('select#apt option:selected').text();
 	var params = getChartConditions();
 
-//	drawSaleLineChart(apt, title, from_ym, to_ym, area_type);
 	drawSaleLineChart(params, title);
 
 }
 
 function requestRankChart(gubun) {
 
-/*
-	var danji = $('input#danji').is(":checked") ? "Y" : "N";
-	var ages = $('select#ages').val();
-	var age_sign = $('select#age_sign').val();
-  
-	var area_type = "";
-	var checkboxes = $('input#area_type');
-	for(var i = 0; i < checkboxes.length; i++) {
-		if (checkboxes[i].checked)
-			area_type += checkboxes[i].value;
-	}
-	if (area_type.length == checkboxes.length * 2)
-		area_type = "";
-
-	var region = $('select#region').val();
-	if (gubun == 'Region') region = '11000';
-	var dong = $('select#dong').val();
-	if (gubun != 'Apt') dong = '00000';
-	
-*/
-
 	var params = getChartConditions();
 
-	params['base_ym'] = $('#base_ym').val();
-	params['years'] = $('#years option:selected').val();
-
-//	drawRankChart(gubun, $('#base_ym').val(), $('#years option:selected').val(), region, dong, ages, age_sign, area_type);
 	drawRankChart(gubun, params);
 }
 
@@ -325,7 +336,7 @@ function closeMessage() {
 			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
 		</div>
 	</div>
-	<div class="my-box">
+	<div class="my-box" id="chart_conditions">
 		<label><strong>연간 평균평단가 비교</strong></label><br>
 			<input id=base_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS 
 				<select id=years>
@@ -352,13 +363,14 @@ function closeMessage() {
 </div>
 <script>
 const MIN_YY = 2006;
+const DEFAULT_PERIOD = 3;
 $(document).ready(function(){ 
 	var today = new Date();
 	var yy = today.getFullYear();
 	var mm = today.getMonth()+1;
 	var to_ym = yy * 100 + mm;
 	// from_ym set to 3 years minus one month ago
-	var from_ym = (mm == 12 ? (yy - 2) * 100 + 1 : (yy - 3) * 100 + mm + 1);
+	var from_ym = (mm == 12 ? (yy - (DEFAULT_PERIOD - 1)) * 100 + 1 : (yy - DEFAULT_PERIOD) * 100 + mm + 1);
 	for(var y = MIN_YY; y < to_ym / 100; y++) {
 		var html = "<tr>";
 		for(var m = 1; m <= 12; m++) {
