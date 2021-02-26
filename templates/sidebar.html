@@ -5,10 +5,6 @@ var gDongsMap = {};
 var gAptMap = {};
 var gDrawOptions = {};
 
-function setDrawOption(checkbox) {
-	gDrawOptions[checkbox.id] = checkbox.checked;
-}
-
 function constructSel(sel, data, allTitle, allValue) {
 	sel.empty();
 	var option = document.createElement("option");
@@ -328,12 +324,12 @@ function closeMessage() {
 		<label><strong>평균평단가 추이</strong></label><br>
 		<button id='region_btn' onclick="requestSaleStat();">구/동별 평균평단가 추이</button>
 		<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
-		<div id="gDrawOptions">
+		<div id="draw_options">
 			<label><strong>차트 옵션</strong></label><br>
-			<input id=draw_overlap type=checkbox onchange="setDrawOption(this);">겹쳐 그리기</input><br>
-			<input id=draw_relative type=checkbox onchange="setDrawOption(this); updateChart();">상대수치로 보기</input><br>
-			<input id=draw_ma type=checkbox onchange="setDrawOption(this); updateChart();">연간 이동평균 같이 보기</input><br>
-			<input id=draw_volume type=checkbox onchange="setDrawOption(this); updateChart();">거래량 같이 보기<br></input>
+			<input id=draw_overlap type=checkbox>겹쳐 그리기</input><br>
+			<input id=draw_relative type=checkbox onchange="updateChart();">상대수치로 보기</input><br>
+			<input id=draw_ma type=checkbox onchange="updateChart();">연간 이동평균 같이 보기</input><br>
+			<input id=draw_volume type=checkbox onchange="updateChart();">거래량 같이 보기<br></input>
 		</div>
 	</div>
 	<div class="my-box" id="chart_conditions">
@@ -362,57 +358,140 @@ function closeMessage() {
 </table>
 </div>
 <script>
-const MIN_YY = 2006;
-const DEFAULT_PERIOD = 3;
-$(document).ready(function(){ 
-	var today = new Date();
-	var yy = today.getFullYear();
-	var mm = today.getMonth()+1;
-	var to_ym = yy * 100 + mm;
-	// from_ym set to 3 years minus one month ago
-	var from_ym = (mm == 12 ? (yy - (DEFAULT_PERIOD - 1)) * 100 + 1 : (yy - DEFAULT_PERIOD) * 100 + mm + 1);
-	for(var y = MIN_YY; y < to_ym / 100; y++) {
-		var html = "<tr>";
-		for(var m = 1; m <= 12; m++) {
-			html += "<td class=one_ym>" + (y*100 + m <= to_ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
-		}
-		html += "</tr>:"
-		$('#ym_table_asc > tbody:last').append(html);
+function setErrorHandler() {
+	window.onerror = function (msg, url, lineNo, columnNo, error) {
+		var string = msg.toLowerCase();
+	    var message = [
+			'Message: ' + msg,
+			'Line: ' + lineNo,
+			'Column: ' + columnNo,
+			'Error object: ' + JSON.stringify(error)
+		].join(' - ');
+	
+		alert(message);
+
+		return false;
 	};
-	$('input#from_ym').val(from_ym);
-	$('input#to_ym').val(to_ym);
-	$('input#base_ym').val(to_ym);
-	for(var y = Number.parseInt(to_ym / 100); y >= MIN_YY; y--) {
-		var html = "<tr>";
-		for(var m = 1; m <= 12; m++) {
-			html += "<td class=one_ym>" + (y*100 + m <= to_ym ? (y + "" + (m < 10 ? "0"+m : m)) : "") + "</td>";
-		}
-		html += "</tr>:"
-		$('#ym_table_desc > tbody:last').append(html);
-	};
-
-	$('.one_ym').click( function() {
-		var div = $($(this).parents('div')[0]);
-		var target = div.attr("target");
-		$('#'+target).val($(this).text());
-		div.hide();
-	});
-
-	$(".one_ym").hover(function(){
-		$(this).css("background-color", "yellow");
-    }, function(){
-		$(this).css("background-color", $(this).parent().css("background-color"));
-	});
-
-	$(window).click(function(e) {
-		$('.popup').hide();
-	});
 
 	$.ajaxSetup({
 		"error":function() { 
 			alert("서버에서 오류가 발생했습니다.");
 			closeMessage();
 		}
+	});
+}
+
+function initDrawOptionsMap() {
+
+	var params = {};
+
+	$('#draw_options input').each(function(index, item) {
+		input = $(item);
+		var key = input.attr('id');
+		params[key] = input;
+	});
+
+	gDrawOptions = { params: params };
+
+	Object.keys(params).forEach(function(key) {
+
+		var item = params[key];
+		var input = item;
+
+		Object.defineProperty(gDrawOptions, key, {
+			get: function () { 
+				var input = this.params[key];
+				return input.is(':checked');
+			},
+			set: function(bool) {
+				var item = this.params[key];
+				item.attr('checked', bool == true);
+			}
+		});
+	});
+	Object.defineProperty(gDrawOptions, "checked", {
+		set: function(bool) {
+			Object.values(this.params).forEach(function(item) {
+				item.prop('checked', bool);
+			});
+		}
+	});
+	Object.defineProperty(gDrawOptions, "disabled", {
+		set: function(bool) {
+			Object.values(this.params).forEach(function(item) {
+				item.prop('disabled', bool);
+			});
+		}
+	});
+
+}
+
+function makeHtml4MonthsTR(y, to_ym) {
+
+	var html = "<tr>";
+	html += "<td>" + y + "년</td>";
+	for(var m = 1; m <= 12; m++) {
+		var ym = (y*100 + m <= to_ym ? (y + "" + (m < 10 ? "0"+m : m)) : "");
+		html += "<td class=one_ym value='" + ym + "'>" + (ym.length > 0 ? m+"월" : "") + "</td>";
+	}
+	html += "</tr>:"
+
+	return html;
+}
+
+function initSelectYMTable() {
+
+	const MIN_YY = 2006;
+	const DEFAULT_PERIOD = 3;
+
+	var today = new Date();
+	var yy = today.getFullYear();
+	var mm = today.getMonth()+1;
+	var to_ym = yy * 100 + mm;
+	// from_ym set to 3 years minus one month ago
+	var from_ym = (mm == 12 ? (yy - (DEFAULT_PERIOD - 1)) * 100 + 1 : (yy - DEFAULT_PERIOD) * 100 + mm + 1);
+
+	for(var y = MIN_YY; y < to_ym / 100; y++) {
+		var html = makeHtml4MonthsTR(y, to_ym);
+		$('#ym_table_asc > tbody:last').append(html);
+	};
+	$('input#from_ym').val(from_ym);
+	$('input#to_ym').val(to_ym);
+	$('input#base_ym').val(to_ym);
+	for(var y = Number.parseInt(to_ym / 100); y >= MIN_YY; y--) {
+		var html = makeHtml4MonthsTR(y, to_ym);
+		$('#ym_table_desc > tbody:last').append(html);
+	};
+
+	$('.one_ym').click( function() {
+		var div = $($(this).parents('div')[0]);
+		var target = div.attr("target");
+		if ($(this).attr('value') != '') {
+			$('#'+target).val($(this).attr('value'));
+			div.hide();
+		}
+	});
+
+	$(".one_ym").hover(function(){
+		if ($(this).attr('value') != '')
+			$(this).css("background-color", "yellow");
+    }, function(){
+		$(this).css("background-color", $(this).parent().css("background-color"));
+	});
+
+}
+
+$(document).ready(function(){ 
+
+	initSelectYMTable();
+
+	initDrawOptionsMap();
+
+	setErrorHandler();
+
+	// hide any popup div at uncaptured click event
+	$(window).click(function(e) {
+		$('.popup').hide();
 	});
 
 	$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){

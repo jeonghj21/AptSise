@@ -85,19 +85,21 @@ function showAptSaleTable(event, data) {
 	div.css({top: pos.y+'px', left: pos.x+'px', display: 'block'});
 }
 
-function addRightYAxe(additionalParams) {
+function addRightYAxe(label) {
 	if (myChart == null) return;
 
 	myChart['options']['scales']['yAxes'].push({
 		id: 'B',
 		type: 'linear',
 		position: 'right',
+		scaleLabel: {
+			display: true,
+			labelString: label
+		},
 		ticks: {
 			min: 0
 		}
 	});
-	if (additionalParams)
-		myChart['options']['scales']['yAxes'].push(additionalParams);
 
 }
 
@@ -394,7 +396,7 @@ function drawLegend(chart) {
 
 }
 
-function createChart(title, labels, type, func) {
+function createChart(title, labels, type, func, yLabel) {
 	resetChartColor();
 
 	var ctx = document.getElementById("myChart").getContext("2d");
@@ -409,6 +411,10 @@ function createChart(title, labels, type, func) {
 				yAxes: [{
 					id: 'A',
 					type: 'linear',
+					scaleLabel: {
+						display: true,
+						labelString: yLabel
+					},
 					position: 'left'
 				}]
 			}
@@ -610,7 +616,7 @@ function updateChart() {
 		myChart['data']['datasets'].pop();
 
 	if (gDrawOptions['draw_volume'] && myChart['options']['scales']['yAxes'].length == 1)
-		addRightYAxe();
+		addRightYAxe('거래건수');
 
 	if (!gDrawOptions['draw_volume'] && myChart['options']['scales']['yAxes'].length > 1)
 		removeRightYAxe();
@@ -693,7 +699,7 @@ function drawChart(title, labels, data, chartOptions){
 	if (gDrawOptions['draw_volume'] && volumeData) {
 		if (myChart['options']['scales']['yAxes'].length > 1)
 			removeRightYAxe();
-		addRightYAxe();
+		addRightYAxe('거래건수');
 
 		makeChartDataset('bar', title + "(거래건수)", 'B', volumeData, 'yellow', chartOptions);
 	}
@@ -717,7 +723,8 @@ function drawNewChart(title, labels, data, params){
 	const volumeData = data['cnt'];
 	const maData = data['ma'];
 
-	$("#gDrawOptions > input:checkbox").attr("disabled",false);
+	gDrawOptions.disabled = false;
+
 	// 팡업 화면을 숨긴다
 	$("#aptSaleDiv").hide();
 
@@ -729,7 +736,7 @@ function drawNewChart(title, labels, data, params){
 	// 차트가 없다면 생성한다
 	if (myChart == null) {
 		let func = function(chart) { return drawLegend(chart); };
-		createChart(title, labels, 'line', func);
+		createChart(title, labels, 'line', func, '평단가');
 	}
 
 	// 기존에 그려진 차트가 있으면
@@ -953,8 +960,8 @@ function getCurYM() {
 
 function drawRankChart(gubun, params) {
 	
-	$("#gDrawOptions > input:checkbox").prop("checked",false).change();
-	$("#gDrawOptions > input:checkbox").attr("disabled",true);
+	gDrawOptions.checked = false;
+	gDrawOptions.disabled = true;
 	let title = '';
 
 	const base_ym = getConditionParam(params, 'base_ym', getCurYM());
@@ -1009,21 +1016,20 @@ function drawRankChart(gubun, params) {
 
 		gChartArea = gubun;
 
-		createChart(title, data['labels'], 'line', function(chart) { return drawRankLegend(chart); });
-
+		createChart(title, data['labels'], 'line', function(chart) { return drawRankLegend(chart); }, '변동율');
 
 		myChart.options.tooltips.callbacks = {
         	beforeBody: function(tooltipItem, data) {
 				if (tooltipItem.length != 1) return;
 				if (tooltipItem[0].datasetIndex != 1 && tooltipItem[0].datasetIndex != 2) return;
-				dsIndex = tooltipItem[0].datasetIndex % 2 + 1;
-				ds = myChart.data.datasets[dsIndex];
-				body = myChart.data.datasets[tooltipItem[0].datasetIndex].label + ": " + tooltipItem[0].value + " / " + ds.label + ": " + ds.data[tooltipItem[0].index];
+				let dsIndex = tooltipItem[0].datasetIndex % 2 + 1;
+				let ds = myChart.data.datasets[dsIndex];
+				let body = myChart.data.datasets[tooltipItem[0].datasetIndex].label + ": " + tooltipItem[0].value + " / " + ds.label + ": " + ds.data[tooltipItem[0].index];
 				tooltipItem.pop();
 				return body;
 			}
 		};
-																																							    
+
 		if (page > 1)
 			params['hasPrior'] = true;
 		else
@@ -1051,7 +1057,7 @@ function drawRankChart(gubun, params) {
 			},
 	    	offset: true
       	});
-		addRightYAxe();
+		addRightYAxe('평단가');
 
 		makeChartDataset('bar', base_ym + '의 평단가', 'B', data['price'], null, { backgroundColor : 'rgba(0, 255, 0, 0.5)', barPercentage: 0.9 });
 		makeChartDataset('bar', years + '년 전의 평단가', 'B', data['before_price'], null, { backgroundColor : 'rgba(255, 0, 0, 1)', xAxisID: 'X2', barPercentage: 0.5 });
