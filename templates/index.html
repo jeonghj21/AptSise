@@ -953,6 +953,7 @@ function getCurYM() {
 
 function drawRankChart(gubun, params) {
 	
+	$("#gDrawOptions > input:checkbox").prop("checked",false).change();
 	$("#gDrawOptions > input:checkbox").attr("disabled",true);
 	let title = '';
 
