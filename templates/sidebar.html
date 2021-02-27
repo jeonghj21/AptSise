@@ -38,19 +38,22 @@ function refreshDong(val) {
 	if (val != '11000')
 		dongs = gDongsMap[val];
 	constructSel(sel, dongs, "구 전체", "00000");
+	constructAptSel(val, "00000");
 }
 
 function constructAptSel(region, dong) {
 
 	var data = [];
-	if ($("#danji").is(":checked")) {
-		$.each(gAptMap[region+dong], function(idx, r) {
-			if (r[2] != null)
-				data.push(r);
-		});
-		list = data;
-	} else {
-		data = gAptMap[region+dong];
+	if (dong != "00000") {
+		if ($("#danji").is(":checked")) {
+			$.each(gAptMap[region+dong], function(idx, r) {
+				if (r[2] != null)
+					data.push(r);
+			});
+			list = data;
+		} else {
+			data = gAptMap[region+dong];
+		}
 	}
 
 	constructSel($("#apt"), data, "아파트를 선택하세요", "");
