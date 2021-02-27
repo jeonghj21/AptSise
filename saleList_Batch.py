@@ -276,7 +276,7 @@ INSERT_APT_SALE_DELETED = """
 	 	   not in (
 		   		select 거래금액, concat(년,lpad(월, 2, '0'), lpad(일, 2, '0')), 전용면적, cast(층 as signed integer),
 	 				   법정동시군구코드, 법정동읍면동코드, 도로명코드, 아파트, 일련번호 
-				  from raw_data 
+				  from tmp_raw_data 
 				 where ym = %s
 			   )
 """

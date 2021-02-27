@@ -72,6 +72,45 @@ function refreshApt() {
 	});
 }
 
+function getValueOfParam(params, key) {
+	var input = params[key];
+	if (Array.isArray(input)) {
+		if (input.length == $('#chart_conditions #'+key).length)
+			return '';
+		else { 
+			var value = '';
+			input.forEach(function(item) {
+				value += item.val();
+			});
+			return value;
+		}
+	} else if (typeof input == "string" || typeof input == "number") {
+		return input;
+	} else {
+		// skip if no input, not checked
+		if (input.val() == null || (input.attr('type') == 'checkbox' && !input.is(':checked')))
+			return '';
+		return input.val();
+	}
+}
+
+function setValueOfParam(params, key, newValue) {
+	var input = params[key];
+	if (Array.isArray(input)) {
+		var pos = 0;
+		input.forEach(function(item) {
+			if(item.val() == newValue.substring(pos, pos+input.value_len)) {
+				item.prop("checked", true);
+			}
+			pos += input.value_len;
+		});
+	} else if (typeof input == "string" || typeof input == "number") {
+		params[key] = newValue;
+	} else {
+		input.val(newValue).change();
+	}
+}
+
 function getChartConditions() {
 
 	var params = {};
@@ -105,86 +144,19 @@ function getChartConditions() {
 
 		Object.defineProperty(map, key,
 		{ get: function () { 
-			var input = this.params[key];
-			if (Array.isArray(input)) {
-				if (input.length == $('#chart_conditions #'+key).length)
-					return '';
-				else { 
-					var value = '';
-					input.forEach(function(item) {
-						value += item.val();
-					});
-					return value;
-				}
-			} else if (typeof input == "string" || typeof input == "number") {
-				return input;
-			} else {
-				// skip if no input, not checked
-				if (input.val() == null || (input.attr('type') == 'checkbox' && !input.is(':checked')))
-					return '';
-				return input.val();
-			}
+			return getValueOfParam(this.params, key);
 		}, set: function(newValue) {
-			var input = this.params[key];
-			if (Array.isArray(input)) {
-				var pos = 0;
-				input.forEach(function(item) {
-					if(item.val() == newValue.substring(pos, pos+input.value_len)) {
-						item.prop("checked", true);
-					}
-					pos += input.value_len;
-				});
-			} else if (typeof input == "string" || typeof input == "number") {
-				this.params[key] = newValue;
-			} else {
-				input.val(newValue).change();
-			}
+			setValueOfParam(this.params, key, newValue);
 		}});
 	});
 
 	return map;
 
 }
-/*
-function getChartConditions() {
 
-	params = {};
-	dup_params = {};
-
-	$('#chart_conditions input, #chart_conditions select').each(function(index, item) {
-		input = $(item);
-
-		// skip if no input, not checked
-		if (input.val() == null || (input.attr('type') == 'checkbox' && !input.is(':checked')))
-			return;
-		key = input.attr('id');
-		value = params[key];
-		if (value != null) {
-			// to check multi-checkbox all checked
-			count = dup_params[key];
-			if (count == null) count = 1;
-			dup_params[key] = count+1;
-		} else
-			value = '';
-		value += input.val();
-		params[key] = value;
-	});
-
-	for(const key in dup_params) {
-		tags = $('#chart_conditions #'+key);
-		// if multi-checkbox all checked clear the condition
-		if (dup_params[key] == tags.length)
-			params[key] = '';
-	}
-
-	return params;
-
-}
-*/
 function requestSaleStat() {
 
 	var params = getChartConditions();
-	//var params = getForm2Map();
 
 	var title;
 	if ($("select#dong")[0].selectedIndex <= 0) {
