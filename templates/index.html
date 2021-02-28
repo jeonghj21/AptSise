@@ -480,6 +480,30 @@ function goForRankChartOrAptSaleTable(chartData, label, evt) {
 	}
 }
 
+function chartClickEventHandler(evt) {
+	var activePoint = myChart.getElementAtEvent(evt);
+
+	// make sure click was on an actual point
+	if (activePoint.length == 0)
+		return false;
+
+	var clickedDatasetIndex = activePoint[0]._datasetIndex;
+	var clickedDataIndex = activePoint[0]._index;
+
+	var originChartData = getChartDataAtEvent(clickedDatasetIndex);
+	// leave origin data unchanged
+	let chartData = originChartData;
+
+	var label = myChart.data.labels[clickedDataIndex];
+	if (gChartArea != '') { // if Current Chart is Rank Chart
+		goForSaleLineChart(chartData, label, clickedDataIndex);
+	} else {
+		goForRankChartOrAptSaleTable(chartData, label, evt);
+	}
+
+	$("#aptSaleDiv").hide();
+}
+
 function createChart(title, labels, type, func, yLabel) {
 	resetChartColor();
 
@@ -491,7 +515,7 @@ function createChart(title, labels, type, func, yLabel) {
 			datasets : []
 		},
 		options : {
-	scales: {
+			scales: {
 				yAxes: [{
 					id: 'A',
 					type: 'linear',
@@ -509,30 +533,7 @@ function createChart(title, labels, type, func, yLabel) {
 		myChart.options['legendCallback'] = func;
 	}
 
-	document.getElementById("myChart").onclick = function(evt) {
-		var activePoint = myChart.getElementAtEvent(event);
-
-		// make sure click was on an actual point
-		if (activePoint.length == 0)
-			return false;
-
-		var clickedDatasetIndex = activePoint[0]._datasetIndex;
-		var originChartData = getChartDataAtEvent(clickedDatasetIndex);
-
-		// leave origin data unchanged
-		let chartData = $.extend(originChartData);
-
-		var clickedDataIndex = activePoint[0]._index;
-		var label = myChart.data.labels[clickedDataIndex];
-		if (gChartArea != '') { // if Current Chart is Rank Chart
-			goForSaleLineChart(chartData, label, clickedDataIndex);
-		} else {
-			goForRankChartOrAptSaleTable(chartData, label, evt);
-		}
-
-		$("#aptSaleDiv").hide();
-	};
-
+	document.getElementById("myChart").onclick = chartClickEventHandler;
 }
 
 function clearChart() {
@@ -645,7 +646,7 @@ function updateChart() {
 	// 보관하고 있는 원래의 데이터로 다시 차트를 그린다
 	for(let key of gChartData.keys()) {
 		var chart = gChartData.get(key);
-		drawChart(key, chart.labels, chart.data, chart.chartOptions);
+		drawChart(key, chart.labels, $.extend(true, {}, chart.data), chart.chartOptions);
 	}
 }
 
@@ -683,6 +684,22 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 	myChart['data']['datasets'].push(dataset);
 }
 
+function setDataRelative(mainData, maData) {
+	// null이 아닌 첫번째 데이터를 찾아서
+	var base_pos = 0;
+	while (true) {
+		if (mainData[base_pos] == null && base_pos < mainData.length)
+			base_pos++;
+		else
+			break;
+	}
+	if (base_pos == mainData.length) 
+		base_pos--;
+	makeRelativeData(base_pos, mainData);
+	if (gDrawOptions['draw_ma'] && maData != null)
+		makeRelativeData(base_pos, maData);
+}
+
 function drawChart(title, labels, data, chartOptions){
 
 	const mainData = data['data'];
@@ -691,18 +708,7 @@ function drawChart(title, labels, data, chartOptions){
 
 	// 상대수치로 그리기 라면
 	if (gDrawOptions['draw_relative']) {
-		// null이 아닌 첫번째 데이터를 찾아서
-		var base_pos = 0;
-		while (true) {
-			if (mainData[base_pos] == null && base_pos < mainData.length)
-				base_pos++;
-			else
-				break;
-		}
-		if (base_pos == mainData.length) base_pos--;
-		makeRelativeData(base_pos, mainData);
-		if (gDrawOptions['draw_ma'] && maData != null)
-			makeRelativeData(base_pos, maData);
+		setDataRelative(mainData, maData);
 	}
 
 	if (!chartOptions)
@@ -774,7 +780,7 @@ function drawNewChart(title, labels, data, params){
 	gChartData.set(title, {
 		labels : $.extend({}, labels),
 		data : $.extend({}, data),
-		params : params    
+		params : params   
 	});
 
 	// 차트용 데이터를 구성하고 차트를 그린다
