@@ -1,0 +1,9 @@
+릴리즈 v0.7 추가/변경 사항
+1. 전국 지역코드 테이블 신규 : region_cd
+2. 전국 부동산 실거래 데이터 수집
+3. 지역 선택 화면을 3단계로 : 시도 -> 시군구 -> 읍면동 (region_cd.level = 1,2,3으로 구분)
+4. 원천 실거래 데이타에 해제발생일/해제발생사유 컬럼 추가하여 테이블 신규 생성
+  : raw_data -> raw_data_new, tmp_raw_data -> tmp_raw_data_new, tmp_raw_data2 -> tmp_raw_data2_new
+5. 층, 건축년도가 비어 있는 경우 오류 안나도록 쿼리 수정
+6. apt_sale_deleted에 삭제 대상 등록시 해제발생일 <> '' or 해제발생일 is not null 조건 추가
+7. 작업 오류시에도 get/ins/del/new apt 건수 등록 => 어디까지 처리된 건지 알 수 있도록
