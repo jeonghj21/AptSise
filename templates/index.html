@@ -316,6 +316,9 @@ function delChart(index) {
 
 function setLineThick(index, thick, recursive) {
 	var meta = myChart.getDatasetMeta(index);
+	if (!meta || !meta.controller || !meta.controller._cachedDataOpts)
+		return;
+
 	if (thick) {
 		myChart.data.datasets[index].borderWidth = 2 + meta.controller._cachedDataOpts.borderWidth;
 		myChart.data.datasets[index].oldColor = meta.controller._cachedDataOpts.borderColor;
@@ -436,9 +439,6 @@ function goForSaleLineChart(chartData, label, dataIndex) {
 		mm++;
 	var from_ym = '' + yy + (mm < 10 ? "0"+mm : mm);
 
-	var region = chartData.data['region'][dataIndex];
-
-	chartData.params['region'] = region;
 	chartData.params['from_ym'] = from_ym;
 	chartData.params['to_ym'] = chartData.params['base_ym'];
 
@@ -446,12 +446,8 @@ function goForSaleLineChart(chartData, label, dataIndex) {
 	case 'Region':
 		drawSaleStat(chartData.params, label);
 		break;
-	case 'Dong':
-		chartData.params['dong'] = chartData.data['dong'][dataIndex];
-		drawSaleStat(chartData.params, label);
-		break;
 	case 'Apt':
-		chartData.params['dong'] = chartData.data['dong'][dataIndex];
+		chartData.params['region_key'] = chartData.data['region_key'][dataIndex];
 		chartData.params['apt'] = chartData.data['apt'][dataIndex];
 		drawSaleLineChart(chartData.params, label);
 	}
@@ -459,23 +455,22 @@ function goForSaleLineChart(chartData, label, dataIndex) {
 
 function goForRankChartOrAptSaleTable(chartData, label, evt) {
 	if (chartData.params['apt'] != '') {
-		chartData.params['ym'] = label;
+		chartData.params['base_ym'] = label;
 		$.getJSON(getChartURL('getAptSale', chartData.params), function(jsonData){
 			data = JSON.parse(jsonData);
 			showAptSaleTable(evt, data);
 		});
 	} else {
 		let gubun = '';
-		// If no region, it's region rank chart
-		if (chartData.params['region'] == '11000' || chartData.params['region'] == '') {
+		// If no region_key, it's region_key rank chart
+		const region_key = chartData.params['region_key'];
+		const region = gRegionsMap[region_key];
+		chartData.params['base_ym'] = label;
+		if (region['level'] < 3) {
 			gubun = 'Region';
-		// If no dong, it's dong rank chart
-		} else if (chartData.params['dong'] == '00000' || chartData.params['dong'] == '') {
-			gubun = 'Dong';
 		} else {
 			gubun = 'Apt';
 		}
-		chartData.params['base_ym'] = label;
 		drawRankChart(gubun, chartData.params);
 	}
 }
@@ -495,7 +490,11 @@ function chartClickEventHandler(evt) {
 	let chartData = originChartData;
 
 	var label = myChart.data.labels[clickedDataIndex];
+
+
 	if (gChartArea != '') { // if Current Chart is Rank Chart
+		// drill down to sub-region
+		chartData.params['region_key'] = chartData.data['region_key'][clickedDataIndex];
 		goForSaleLineChart(chartData, label, clickedDataIndex);
 	} else {
 		goForRankChartOrAptSaleTable(chartData, label, evt);
@@ -504,7 +503,7 @@ function chartClickEventHandler(evt) {
 	$("#aptSaleDiv").hide();
 }
 
-function createChart(title, labels, type, func, yLabel) {
+function createChart(title, labels, type, legendCallbackFunc, yLabel) {
 	resetChartColor();
 
 	var ctx = document.getElementById("myChart").getContext("2d");
@@ -528,9 +527,9 @@ function createChart(title, labels, type, func, yLabel) {
 			}
 		}
 	});
-	if (func) {
+	if (legendCallbackFunc) {
 		myChart.options['legend'] = false;
-		myChart.options['legendCallback'] = func;
+		myChart.options['legendCallback'] = legendCallbackFunc;
 	}
 
 	document.getElementById("myChart").onclick = chartClickEventHandler;
@@ -646,7 +645,7 @@ function updateChart() {
 	// 보관하고 있는 원래의 데이터로 다시 차트를 그린다
 	for(let key of gChartData.keys()) {
 		var chart = gChartData.get(key);
-		drawChart(key, chart.labels, $.extend(true, {}, chart.data), chart.chartOptions);
+		drawChart(key, chart.labels, $.extend(true, {}, chart.data), chart.params, chart.chartOptions);
 	}
 }
 
@@ -682,7 +681,9 @@ function makeChartDataset(chartType, title, yAxisID, data, color, additionalPara
 			});
 
 	myChart['data']['datasets'].push(dataset);
+
 }
+
 
 function setDataRelative(mainData, maData) {
 	// null이 아닌 첫번째 데이터를 찾아서
@@ -700,7 +701,62 @@ function setDataRelative(mainData, maData) {
 		makeRelativeData(base_pos, maData);
 }
 
-function drawChart(title, labels, data, chartOptions){
+function getTooltip4MaxSale(tooltipItem, data) {
+	if (tooltipItem.length != 1) return;
+	let ds = myChart.data.datasets[tooltipItem[0].datasetIndex];
+	if (!ds['raw_data']) return;
+	let raw_data = ds['raw_data'][tooltipItem[0].index];
+	if (!raw_data || !raw_data['gubun']) return;
+	let body;
+	if (raw_data['gubun'] == '1') {
+		body = "기간내 최고평단가 : ";
+	} else {
+		body = "기간내 최고매매가 : ";
+	}
+	body += " (" + raw_data['saled'] + ", " + (raw_data['apt']?raw_data['apt']+",":"") + raw_data['price'] + " 만원," + raw_data['area'] + " m2, " + raw_data['floor'] + "층)";
+	return body;
+}
+
+function makeBoxPlotDataset(labels, data, yAxesId, title, color, params) {
+
+	let chartOptions = {};
+
+	chartOptions['pointRadius'] = 5;
+	let bgColor = chartOptions['backgroundColor'];
+	chartOptions['backgroundColor'] = 'rgba(0, 0, 0, 0)';
+	let brColor = chartOptions['borderColor'];
+	chartOptions['borderColor'] = 'rgba(0, 0, 0, 0)';
+	chartOptions['spinGaps'] = false;
+
+	chartOptions['pointBackgroundColor'] = color;
+	chartOptions['raw_data'] = [];
+	
+	let scatterData = [];
+	for( var i = 0; i < labels.length; i++) {
+		var label = labels[i];
+		// 2 data - max & min for one ym
+		if (label == data[i*2]['ym']) {
+			let d = label.substring(0, 4) + "-" + label.substring(4, 6) + "-01T00:00:00";
+			let ts = Date.parse(d);
+			scatterData.push( { 'x': ts, 'y': data[i]['max_price'] } );
+			scatterData.push( { 'x': ts, 'y': data[i]['1q_price'] } );
+			scatterData.push( { 'x': ts, 'y': data[i]['median_price'] } );
+			scatterData.push( { 'x': ts, 'y': data[i]['3q_price'] } );
+			scatterData.push( { 'x': ts, 'y': data[i]['min_price'] } );
+			chartOptions['raw_data'][i] = [ data[i], data[i+1] ];
+		}
+	}
+	
+	makeChartDataset('scatter', title, yAxesId, scatterData, 'blue', chartOptions);
+
+	delete chartOptions['pointRadius'];
+	chartOptions['backgroundColor'] = bgColor ;
+	delete chartOptions['pointBackgroundColor'];
+	chartOptions['borderColor'] = brColor ;
+	chartOptions['spinGaps'] = true;
+}
+
+function drawChart(title, labels, data, params, chartOptions){
 
 	const mainData = data['data'];
 	const volumeData = data['cnt'];
@@ -721,9 +777,6 @@ function drawChart(title, labels, data, chartOptions){
 		chartOptions['backgroundColor'] = bgColor;
 	}
 
-	chartData = gChartData.get(title);
-	chartData['chartOptions'] = chartOptions;
-
 	makeChartDataset('line', title, 'A', mainData, 'red', chartOptions);
 
 	// 거래량 같이 그리기
@@ -743,6 +796,10 @@ function drawChart(title, labels, data, chartOptions){
 	}
 
 	$('#chartLegend').html(myChart.generateLegend()); 
+
+	myChart.options.tooltips.callbacks = {
+       	beforeBody: getTooltip4MaxSale
+	};
 
 	myChart.update();
 
@@ -776,15 +833,14 @@ function drawNewChart(title, labels, data, params){
 		spreadLabels(labels, mainData, volumeData);
 	}
 
-	// 전역변수에 차트 데이터를 저장한다
 	gChartData.set(title, {
-		labels : $.extend({}, labels),
-		data : $.extend({}, data),
-		params : params   
+		data: $.extend({}, data),
+		labels: $.extend({}, labels),
+		params: params
 	});
 
 	// 차트용 데이터를 구성하고 차트를 그린다
-	drawChart(title, labels, data);
+	drawChart(title, labels, data, params);
 
 }
 
@@ -820,12 +876,10 @@ function drawSaleLineChart(params, title) {
 
 function makeChartConditionTitle(title, params, toIgnoreParams = []) {
 
-
 	// check if any param exists
 	var existsParams = false;
 	for(const key in params.params) {
-		// ignore if region/dong params
-		if (key == 'region' || key == 'dong')
+		if (key == 'region_key')
 			continue;
 		if (params[key] != '' && !toIgnoreParams[key]) {
 			existsParams = true;
@@ -840,7 +894,7 @@ function makeChartConditionTitle(title, params, toIgnoreParams = []) {
 	var needsComma = false;
     title += " (";
 	if (!toIgnoreParams['danji']) {
-		const danji = getConditionParam(params, 'danji', 'N');
+		const danji = getConditionParam(params, 'danji');
     	if (danji == "Y"){
       		title += "등록된 단지만";
     	} else {
@@ -989,31 +1043,41 @@ function getCurYM() {
 	return ym;
 }
 
-function makeTitle4RankChart(gubun, params) {
+function getRegionTitle(params) {
 	let title = '';
 
-	if (gubun == 'Region') {
-		title = '[' + $('select#region option:eq(0)').text() + ']';
-	} else if (gubun == 'Dong') {
-		title = '[' + $('select#region option:selected').text() + ']';
-	} else { // Apt
-		if (!gRegionsMap[params['region']]) {
-			title = '[' + $('select#region option:eq(0)').text() + ']';
-		} else {
-			title = '[' + $('select#region option:selected').text();
-			if ($('select#dong option').index($('select#dong option:selected')) != 0) {
-				title += ' ' + $('select#dong option:selected').text();
-			}
-			title += ']';
-		}
+	region = gRegionsMap[params['region_key']];
+
+	switch( region['level']) {
+	case 0:
+		title = '전체';
+		break;
+	case 1:
+		title = region['name'];
+		break;
+	case 2:
+		upper_region = gRegionsMap[region['upper']];
+		title = upper_region['name'];
+		title += " " + region['name'];
+		break;
+	case 3:
+		upper_region = gRegionsMap[region['upper']];
+		upper_upper_region = gRegionsMap[upper_region['upper']];
+		title = upper_upper_region['name'];
+		title += " " + upper_region['name'];
+		title += " " + region['name'];
+		break;
 	}
-	
+		
+	return '[' + title + ']';
+}
+
+function makeTitle4RankChart(gubun, params) {
+	let title = getRegionTitle(params);
+
 	switch(gubun) {
 		case 'Region':
-			title += '구별 평단가 변동율';
-			break;
-		case 'Dong':
-			title += '동별 평단가 변동율';
+			title += '지역별 평단가 변동율';
 			break;
 		case 'Apt':
 			title += '아파트별 평단가 변동율';
@@ -1021,6 +1085,15 @@ function makeTitle4RankChart(gubun, params) {
 	}
 
 	var ignoreParams = {'from_ym':true, 'to_ym':true, 'orderby':true, 'page':true};
+	title = makeChartConditionTitle(title, params, ignoreParams );
+
+	return title;
+}
+
+function makeTitle4BoxPlotChart(params) {
+	let title = getRegionTitle(params);
+
+	var ignoreParams = {};
 	title = makeChartConditionTitle(title, params, ignoreParams );
 
 	return title;
@@ -1087,18 +1160,16 @@ function drawRankChart(gubun, params) {
 
 		$("#aptSaleDiv").hide(); // 팡업 화면을 숨긴다
 
-		gChartArea = gubun; // set current chart to Rank chart
-
 		clearChart();
 		createChart(title, data['labels'], 'line', function(chart) { return drawRankLegend(chart); }, '변동율');
 
+		gChartArea = gubun; // set current chart to Rank chart
 		myChart.options.tooltips.callbacks = {
         	beforeBody: getTooltip4RankChart
 		};
 
 		setPageNavigator(params, data);
 
-		gChartArea = gubun;
 		gChartData.set(title, { 'data': data, 'params': params });
 
 		setXAxeForDualBar();
@@ -1116,6 +1187,42 @@ function drawRankChart(gubun, params) {
 	});
 }
 
+function drawBoxPlotChart(params) {
+	
+	let url = getChartURL("getBoxPlot", params);
+	let title = makeTitle4BoxPlotChart(params);
+
+	showMessage();
+	$.getJSON(url, function(jsonData){
+		data = JSON.parse(jsonData);
+
+		$(".popup").hide(); // 팡업 화면을 숨긴다
+
+		clearChart();
+		createChart(title, data['labels'], 'scatter', null, '평단가');
+
+		myChart.options['scales']['xAxes'][0]['ticks']['userCallback'] = 
+					                function(label, index, labels) {
+					                    let t =  new Date();
+										t.setTime(label);
+										return t.getFullYear() + "/" + (t.getMonth()+1<10?"0"+(t.getMonth()+1):(t.getMonth()+1));
+					                };
+		addRightYAxe('매매가');
+
+		makeBoxPlotDataset(data['labels'], data['data'][0], 'A', title + '(평단가)', 'red');
+		makeBoxPlotDataset(data['labels'], data['data'][1], 'B', title + '(매매가)', 'blue');
+		
+		myChart['options']['scales']['x'] = {
+			type: 'linear',
+			position: 'bottom'
+		};
+
+		$('#chartLegend').html(myChart.generateLegend()); 
+		myChart.update();
+		closeMessage();
+	});
+}
+		
 </script>
 
 

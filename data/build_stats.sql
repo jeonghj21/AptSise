@@ -26,7 +26,7 @@ insert into batch_log values(null, 4, 'build stats', now(), 'apt_sale_stats 1');
 insert into apt_sale_stats
         select r.upper_region, 1, made_year, area_type, ym, danji_flag, (sum(unit_price * cnt) / sum(cnt)), sum(cnt)
           from apt_sale_stats a, region_info r
-         wherea.region_key = r.region_key
+         where a.region_key = r.region_key
            and a.level = 2
          group by r.upper_region, made_year, area_type, ym, danji_flag;
 
@@ -34,24 +34,56 @@ insert into batch_log values(null, 5, 'build stats', now(), 'apt_sale_stats 0');
 insert into apt_sale_stats
         select '0000000000', 0, made_year, area_type, ym, danji_flag, (sum(unit_price * cnt) / sum(cnt)), sum(cnt)
           from apt_sale_stats a
-         where a.ym = %s
-           and a.level = 1
+         where a.level = 1
          group by made_year, area_type, ym, danji_flag;
 
 
-insert into batch_log values(null, 6, 'build stats', now(), apt_region_ma');
+insert into batch_log values(null, 6, 'build stats', now(), 'apt_region_ma ~ 201012');
 truncate apt_region_ma;
 insert into apt_region_ma
         select *
           from (
             select a.region_key, a.level, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
               from tmp_ym b, apt_sale_stats a
-             where a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+             where b.ym between '200601' and '201012'
+			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
              group by b.ym, a.region_key, a.level, a.danji_flag, a.made_year, a.area_type
           ) a;
 
+insert into batch_log values(null, 7, 'build stats', now(), 'apt_region_ma ~ 201512');
+insert into apt_region_ma
+        select *
+          from (
+            select a.region_key, a.level, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
+              from tmp_ym b, apt_sale_stats a
+             where b.ym between '201101' and '201512'
+			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+             group by b.ym, a.region_key, a.level, a.danji_flag, a.made_year, a.area_type
+          ) a;
 
-insert into batch_log values(null, 7, 'build stats', now(), apt_qbox_stats 1 3');
+insert into batch_log values(null, 8, 'build stats', now(), 'apt_region_ma ~ 202012');
+insert into apt_region_ma
+        select *
+          from (
+            select a.region_key, a.level, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
+              from tmp_ym b, apt_sale_stats a
+             where b.ym between '201601' and '202012'
+			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+             group by b.ym, a.region_key, a.level, a.danji_flag, a.made_year, a.area_type
+          ) a;
+
+insert into batch_log values(null, 9, 'build stats', now(), 'apt_region_ma ~ 202103');
+insert into apt_region_ma
+        select *
+          from (
+            select a.region_key, a.level, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
+              from tmp_ym b, apt_sale_stats a
+             where b.ym between '202101' and '202103'
+			   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
+             group by b.ym, a.region_key, a.level, a.danji_flag, a.made_year, a.area_type
+          ) a;
+
+insert into batch_log values(null, 10, 'build stats', now(), 'apt_qbox_stats 1 3');
 truncate apt_qbox_stats;
 SET GROUP_CONCAT_MAX_LEN = 10485760;
 insert into apt_qbox_stats
@@ -73,7 +105,7 @@ insert into apt_qbox_stats
            and m.id = a.apt_id
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
-insert into batch_log values(null, 8, 'build stats', now(), apt_qbox_stats 1 2');
+insert into batch_log values(null, 11, 'build stats', now(), 'apt_qbox_stats 1 2');
 insert into apt_qbox_stats
 select region_key, level, '1', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
@@ -95,7 +127,7 @@ select region_key, level, '1', danji, ym
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
 
-insert into batch_log values(null, 9, 'build stats', now(), apt_qbox_stats 1 1');
+insert into batch_log values(null, 12, 'build stats', now(), 'apt_qbox_stats 1 1');
 insert into apt_qbox_stats
 select region_key, level, '1', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
@@ -118,7 +150,7 @@ select region_key, level, '1', danji, ym
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
 
-insert into batch_log values(null, 10, 'build stats', now(), apt_qbox_stats 1 0');
+insert into batch_log values(null, 13, 'build stats', now(), 'apt_qbox_stats 1 0');
 insert into apt_qbox_stats
 select region_key, level, '1', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
@@ -137,7 +169,7 @@ select region_key, level, '1', danji, ym
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
 
-insert into batch_log values(null, 11, 'build stats', now(), apt_qbox_stats 2 3');
+insert into batch_log values(null, 14, 'build stats', now(), 'apt_qbox_stats 2 3');
 insert into apt_qbox_stats
         select region_key, level, '2', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
@@ -158,7 +190,7 @@ insert into apt_qbox_stats
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
 
-insert into batch_log values(null, 12, 'build stats', now(), apt_qbox_stats 2 2');
+insert into batch_log values(null, 15, 'build stats', now(), 'apt_qbox_stats 2 2');
 insert into apt_qbox_stats
         select region_key, level, '2', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
@@ -180,7 +212,7 @@ insert into apt_qbox_stats
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
 
-insert into batch_log values(null, 13, 'build stats', now(), apt_qbox_stats 2 1');
+insert into batch_log values(null, 16, 'build stats', now(), 'apt_qbox_stats 2 1');
 insert into apt_qbox_stats
         select region_key, level, '2', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
@@ -203,7 +235,7 @@ insert into apt_qbox_stats
 	 group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a;
 
 
-insert into batch_log values(null, 14, 'build stats', now(), apt_qbox_stats 2 0');
+insert into batch_log values(null, 17, 'build stats', now(), 'apt_qbox_stats 2 0');
 insert into apt_qbox_stats
         select region_key, level, '2', danji, ym
              , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)

@@ -1,77 +1,111 @@
 <!-- Sidebar -->
 <script>
-var gRegionsMap = {};
-var gDongsMap = {};
-var gAptMap = {};
+var gRegionsMap = {}; //
+var gRegionsArr = [];
 var gDrawOptions = {};
+let gChartParams = null;
 
-function constructSel(sel, data, allTitle, allValue) {
-	sel.empty();
-	var option = document.createElement("option");
-	option.value = allValue;
-	option.innerText = allTitle;
-	sel.append(option);
-	var temp = [];
-	if (!Array.isArray(data) && typeof data == "object") {
-		for(const key in data) {
-			temp.push([key, data[key]]);
-		}
-		data = temp;
+function constructSel(sel, arr, sortKey = null, filterFunc = null, removeAllFlag = false) {
+	if (removeAllFlag)
+		sel.empty();
+	else
+		sel.children().not(':first').remove();
+
+	if (filterFunc) {
+		arr = arr.slice();
+		$.each(arr, function(index, item) {
+			if (!filterFunc(index, item))
+				delete arr[index];
+		});
 	}
-	data.sort(function(a, b) { return (a[1] < b[1]) ? -1 : ((a[1] == b[1]) ? 0 : 1); });
-	$.each(data, function(idx, r) {
-		option = document.createElement("option");
-		option.value = r[0];
-		option.innerText = r[1];
-		sel.append(option);
+
+	if (sortKey)
+		arr.sort(function(a, b) { return (a[sortKey] < b[sortKey]) ? -1 : ((a[sortKey] == b[sortKey]) ? 0 : 1); });
+
+	$.each(arr, function(idx, r) {
+		if (r) { // not filtered out element
+			option = document.createElement("option");
+			option.value = r['key'];
+			option.innerText = r['name'];
+			sel.append(option);
+		}
 	});
 }
 
 function initRegions() {
-	sel = $("#region");
-	constructSel(sel, gRegionsMap, "서울 전체", "11000");
+	sel = $("#region_key1");
+	constructSel(sel, gRegionsArr);
 }
 
-function refreshDong(val) {
-	var sel = $("#dong");
-	var dongs = [];
-	if (val != '11000')
-		dongs = gDongsMap[val];
-	constructSel(sel, dongs, "구 전체", "00000");
-	constructAptSel(val, "00000");
-}
-
-function constructAptSel(region, dong) {
-
-	var data = [];
-	if (dong != "00000") {
-		if ($("#danji").is(":checked")) {
-			$.each(gAptMap[region+dong], function(idx, r) {
-				if (r[2] != null)
-					data.push(r);
-			});
-			list = data;
-		} else {
-			data = gAptMap[region+dong];
-		}
+function clearChildSelect(sel) {
+	
+	constructSel(sel, {});
+	if (sel.attr('id') == 'apt') {
+		$('#apt').val('').change();
+		$('#danji').attr('disabled', true);
 	}
 
-	constructSel($("#apt"), data, "아파트를 선택하세요", "");
+	let child = sel.attr("child");
+	if (!child)
+		return;
+
+
+	child = $('#' + child);
+	clearChildSelect(child);
+
 }
 
-function refreshApt() {
+function refreshRegion(sel) {
 
-	region = $("#region").val();
-	dong = $("#dong").val();
-	if (gAptMap[region+dong] != null) {
-		constructAptSel(region, dong);
+	let child = sel.attr("child");
+	child = $('#' + child);
+	clearChildSelect(child);
+
+	params = getChartParams();
+	let value = sel.val();
+	if (value == '') { // just clear only
 		return;
 	}
 
-	url = "{{ config['BASE_URL'] }}getApt?region="+region+"&dong="+dong;
+	let level = gRegionsMap[value]['level'];
+	if (level == 3) {
+		refreshApt(child);
+		return;
+	}
+	
+	let arr = gRegionsMap[value]['subregions'];
+
+	constructSel(child, arr, 'name' /* sort by name */, function(index, item) { return item['level'] == level+1; });
+
+}
+
+function refreshApt(apt) {
+
+	clearChildSelect(apt);
+
+	var region_key2 = $("#region_key2").val();
+	var region_key3 = $("#region_key3").val();
+	if (region_key2 == "" || region_key3 == "")
+		return;
+
+	var aptArr = gRegionsMap[region_key3]['subregions'];
+
+	$('#danji').attr('disabled', false);
+	var func = ($("#danji").is(":checked") 
+		? function(index, data) { 
+			return data['danji'] == 'Y'; // data is array of id, array of name, danji_flag
+		  } 
+		: null); 
+	if (aptArr && aptArr.length > 0) { // already cached
+		constructSel($('#apt'), aptArr, -1 /* no sort */, func);
+		return;
+	}
+
+	url = "{{ config['BASE_URL'] }}getApt?region_key="+region_key3;
 	$.getJSON(url, function(data){
-		gAptMap[region+dong] = JSON.parse(data);
-		constructAptSel(region, dong);
+		aptArr = JSON.parse(data);
+		gRegionsMap[region_key3]['subregions'] = aptArr;
+		constructSel($('#apt'), aptArr, -1 /* no sort */, func);
 	});
 }
 
@@ -88,6 +122,18 @@ function getValueOfParam(params, key) {
 			return value;
 		}
 	} else if (typeof input == "string" || typeof input == "number") {
+		if (key == "region_key") {
+			if ($('#region_key3').val() != '') {
+				params[key] = $('#region_key3').val();
+				input = params[key];
+			} else if ($('#region_key2').val() != '') {
+			    params[key] = $('#region_key2').val();
+				input = params[key];
+			} else if ($('#region_key1').val() != '') {
+			    params[key] = $('#region_key1').val();
+				input = params[key];
+			}
+		}
 		return input;
 	} else {
 		// skip if no input, not checked
@@ -108,15 +154,22 @@ function setValueOfParam(params, key, newValue) {
 			pos += input.value_len;
 		});
 	} else if (typeof input == "string" || typeof input == "number") {
+		if (params[key] != newValue && key == "region_key") {
+			let region = gRegionsMap[newValue];
+			if (region) {
+				let level = region['level'];
+				let region_sel = $('#region_key'+level);
+				region_sel.val(newValue).change();
+			}
+		}
 		params[key] = newValue;
 	} else {
 		input.val(newValue).change();
 	}
 }
 
-function getChartConditions() {
-
-	var params = {};
+function initChartParams() {
+	let params = {};
 
 	$('#chart_conditions input, #chart_conditions select').each(function(index, item) {
 		input = $(item);
@@ -135,6 +188,7 @@ function getChartConditions() {
 	params['orderby'] = '';
 	params['page'] = '';
 	params['ym'] = '';
+	params['region_key'] = '0000000000';
 
 	var map = { params: params };
 
@@ -157,19 +211,22 @@ function getChartConditions() {
 
 }
 
-function requestSaleStat() {
+function getChartParams() {
 
-	var params = getChartConditions();
+	if (gChartParams == null) {
 
-	var title;
-	if ($("select#dong")[0].selectedIndex <= 0) {
-		title = $('select#region option:checked').text();
-	} else {
-		title = $('select#region option:checked').text() + " " + $('select#dong option:checked').text();
+		gChartParams = initChartParams();
 	}
 
-	// delete unnecessary parameter 'apt' for region stat
-	delete params['apt'];
+	return gChartParams;
+}
+
+function requestSaleStat() {
+
+	var params = getChartParams();
+
+	var title = getRegionTitle(params);
+
 	drawSaleStat(params, title);
 
 }
@@ -177,7 +234,7 @@ function requestSaleStat() {
 function requestSaleLine() {
 
 	var title = $('select#apt option:selected').text();
-	var params = getChartConditions();
+	var params = getChartParams();
 
 	drawSaleLineChart(params, title);
 
@@ -185,7 +242,11 @@ function requestSaleLine() {
 
 function requestRankChart(gubun) {
 
-	var params = getChartConditions();
+	var params = getChartParams();
+
+	// Region Rank chart's minimum level = 2
+	if (gubun == 'Region' && gRegionsMap[params['region_key']]['level'] == 3)
+		params['region_key'] = gRegionsMap[params['region_key']]['upper'];
 
 	drawRankChart(gubun, params);
 }
@@ -207,10 +268,10 @@ function toggleYMTable(btn, target, desc) {
 	else
 		div = $("#ym_table_asc_div");
 	if (div.is(':visible')) {
-		$('.pop').hide();
+		$('.popup').hide();
 		$('#toggle_btn').text('▼ 보이기');
 	} else {
-		$('.pop').hide();
+		$('.popup').hide();
 		var pos = btn.position();
 		div.attr("target", target);
 		div.css({top: (pos.top+btn.outerHeight())+'px', left: pos.left+'px', display: 'block'});
@@ -227,11 +288,12 @@ function wrapWindowByMask() {
 } 
 	
 /// 화면의 중앙에 레이어띄움 
-function showMessage() { 
+function showMessage(label = '조회') { 
 	wrapWindowByMask(); 
 	$("#light").css("position", "absolute"); 
 	$("#light").css("top", Math.max(0, (($(window).height() - $("#light").outerHeight()) / 2) + $(window).scrollTop() - 100) + "px"); 
 	$("#light").css("left", Math.max(0, (($(window).width() - $("#light").outerWidth()) / 2) + $(window).scrollLeft()) + "px"); 
+	$("#task").text(label);
 	$('#fade').show(); 
 	$('#light').show(); 
 } 
@@ -249,29 +311,36 @@ function closeMessage() {
 		<input id=to_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym', true); return false;">▼</a><br>
 		<table>
 			<tr>
-				<td>구 선택</td><td>동 선택</td>
-			</tr>	
-			<tr>
+				<td>시도</td>
 				<td>
-					<select onchange="refreshDong(this.value);" name="region" id="region" style="width:100%;">
-						<option value="11000">서울 전체</option>
-					</select>
-				</td>
-				<td>
-					<select onchange="refreshApt();" name="dong" id="dong" style="width:100%;">
-						<option value="00000">구 전체</option>
+					<select child=region_key2 onchange="refreshRegion($(this));" id="region_key1" style="width:100%;">
+						<option value=''>전체</option>
 					</select>
 				</td>
 			</tr>
 			<tr>
-				<td>아파트 선택</td>
-				<td style="font-size: small; padding-left: 0px; padding-right: 0px;">
-					<input type=checkbox id=danji value=Y onchange="refreshApt();" />단지만
+				<td>시군구</td>
+				<td>
+					<select child=region_key3 onchange="refreshRegion($(this));" id="region_key2" style="width:100%;">
+						<option value=''>전체</option>
+					</select>
 				</td>
 			</tr>
 			<tr>
-				<td colspan = 2>
-					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == '');"></select>
+				<td>읍면동</td>
+				<td>
+					<select child=apt onchange="refreshRegion($(this));" id="region_key3" style="width:100%;">
+						<option value=''>전체</option>
+					</select>
+				</td>
+			</tr>
+			<tr>
+				<td><input type=checkbox id=danji value=N disabled onchange="if (this.checked) this.value = 'Y'; else this.value = 'N'; refreshApt($('#apt'));" />단지만
+				</td>
+				<td>
+					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == '');">
+						<option value=''>전체</option>
+					</select>
 				</td>
 			</tr>
 		</table>
@@ -297,7 +366,7 @@ function closeMessage() {
 	</div>
 	<div class="my-box">
 		<label><strong>평균평단가 추이</strong></label><br>
-		<button id='region_btn' onclick="requestSaleStat();">구/동별 평균평단가 추이</button>
+		<button id='region_btn' onclick="requestSaleStat();">지역별 평균평단가 추이</button>
 		<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
 		<div id="draw_options">
 			<label><strong>차트 옵션</strong></label><br>
@@ -308,17 +377,28 @@ function closeMessage() {
 		</div>
 	</div>
 	<div class="my-box" id="chart_conditions">
-		<label><strong>연간 평균평단가 비교</strong></label><br>
+		<label><strong>연간 평균평단가 비교</strong>(위에서 지역 선택)</label><br>
 			<input id=base_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS 
 				<select id=years>
 					{%for i in range(1, 20)%} 
 					<option value={{i}}>{{i}}</option>
 					{%endfor%} 
 				</select>년전<br>
-			<button onclick="requestRankChart('Region');">구별 순위</button><br>
-			<button onclick="requestRankChart('Dong');">동별(위에서 구 선택)</button><br>
-			<button onclick="requestRankChart('Apt');">아파트별(구/동 선택가능)</button><br>
+			<button onclick="requestRankChart('Region');">지역별 순위</button><br>
+<!--			<button onclick="drawBoxPlotChart(getChartParams());">지역별 Box Plot</button><br> -->
+			<button onclick="requestRankChart('Apt');">아파트별 순위</button>
+
 	</div>
+	<div class="my-box">
+		<label>최근 작업 상황</label><br>
+		<span>{{result['ym']}} : {{result['start_dt']}} ~ {{result['end_dt']}} : {{result['status']}}</span>
+	</div>
+</div>
+<div id="ym_table_asc_div" class=popup style="display: none; position:absolute; z-index:999;">
+<table id="ym_table_asc">
+	<tbody>
+	</tbody>
+</table>
 </div>
 <div id="ym_table_asc_div" class=popup style="display: none; position:absolute; z-index:999;">
 <table id="ym_table_asc">
@@ -351,6 +431,7 @@ function setErrorHandler() {
 	$.ajaxSetup({
 		"error":function() { 
 			alert("서버에서 오류가 발생했습니다.");
+			$('.popup').hide();
 			closeMessage();
 		}
 	});
@@ -469,11 +550,24 @@ $(document).ready(function(){
 		$('.popup').hide();
 	});
 
-	$.getJSON("{{ config['BASE_URL'] }}getDong", function(data){
-		list = JSON.parse(data);
-		gRegionsMap = list[0];
-		gDongsMap = list[1];
+	showMessage('초기화');
+	$.getJSON("{{ config['BASE_URL'] }}getRegions", function(data){
+		let regions = JSON.parse(data);
+		for (var i = 0; i < regions.length; i++) {
+			const region = regions[i];
+			gRegionsMap[region['key']] = region;
+			let level = region['level'];
+			if (level == 0)
+				continue;
+			if (level == 1)
+				gRegionsArr.push(region);
+			let upper = gRegionsMap[region['upper']];
+			if (!upper['subregions'])
+				upper['subregions'] = [];
+			upper['subregions'].push(region);
+		}
 		initRegions();
+		closeMessage();
 	});
 });
 
