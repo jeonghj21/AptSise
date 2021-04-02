@@ -393,7 +393,8 @@ function drawLegend(chart) {
 		text.push("<input type=button title='삭제' class='chart-btn chart-btn-del' onclick='delChart("+i+");' />");
 		text.push("<input type=button title='엑셀' class='chart-btn chart-btn-excel' onclick='excelChart("+i+");' />");
 		const apt = data.params['apt'];
-		if (apt != undefined) {
+		const region = data.params['region_key'];
+		if (apt != undefined && apt != "" && gRegionsMap[region]['level'] == 3) {
 			text.push("<input type=button title='거래내역엑셀' class='chart-btn chart-btn-excel' onclick='excelSales("+i+","+apt+");' />");
 		}
 		j++;
