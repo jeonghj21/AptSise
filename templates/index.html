@@ -427,6 +427,14 @@ function getChartDataAtEvent(clickedDatasetIndex) {
 	return originChartData;
 }
 
+function dummyFunc(params, label) {
+	if (loadingApt) {
+		window.setTimeout(dummyFunc, 100, params, label);
+	} else {
+		window.setTimeout(drawSaleLineChart, 100, params, label);
+	}
+}
+
 function goForSaleLineChart(chartData, label, dataIndex) {
 
 	let base_ym = chartData.params['base_ym'];
@@ -448,9 +456,8 @@ function goForSaleLineChart(chartData, label, dataIndex) {
 		drawSaleStat(chartData.params, label);
 		break;
 	case 'Apt':
-		chartData.params['region_key'] = chartData.data['region_key'][dataIndex];
 		chartData.params['apt'] = chartData.data['apt'][dataIndex];
-		drawSaleLineChart(chartData.params, label);
+		window.setTimeout(dummyFunc, 100, chartData.params, label);
 	}
 }
 
