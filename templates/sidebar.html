@@ -4,6 +4,7 @@ var gRegionsMap = {}; //
 var gRegionsArr = [];
 var gDrawOptions = {};
 let gChartParams = null;
+var loadingApt = false;
 
 function constructSel(sel, arr, sortKey = null, filterFunc = null, removeAllFlag = false) {
 	if (removeAllFlag)
@@ -63,7 +64,13 @@ function refreshRegion(sel) {
 
 	params = getChartParams();
 	let value = sel.val();
-	if (value == '') { // just clear only
+	if (sel.attr('id').endsWith('1')) { // region_key1 
+		if (value == '')
+			$('#rankByAptBtn').attr('disabled', true);
+		else
+			$('#rankByAptBtn').attr('disabled', false);
+	}
+	if (value == '' || value == null) { // just clear only
 		return;
 	}
 
@@ -80,6 +87,7 @@ function refreshRegion(sel) {
 }
 
 function refreshApt(apt) {
+
 
 	clearChildSelect(apt);
 
@@ -101,11 +109,14 @@ function refreshApt(apt) {
 		return;
 	}
 
+	loadingApt = true;
 	url = "{{ config['BASE_URL'] }}getApt?region_key="+region_key3;
 	$.getJSON(url, function(data){
 		aptArr = JSON.parse(data);
 		gRegionsMap[region_key3]['subregions'] = aptArr;
 		constructSel($('#apt'), aptArr, -1 /* no sort */, func);
+	}).always(function() {
+		loadingApt = false;
 	});
 }
 
@@ -132,6 +143,8 @@ function getValueOfParam(params, key) {
 			} else if ($('#region_key1').val() != '') {
 			    params[key] = $('#region_key1').val();
 				input = params[key];
+			} else {
+				input = "0000000000";
 			}
 		}
 		return input;
@@ -140,6 +153,14 @@ function getValueOfParam(params, key) {
 		if (input.val() == null || (input.attr('type') == 'checkbox' && !input.is(':checked')))
 			return '';
 		return input.val();
+	}
+}
+
+function checkLoadingApt(input, newValue) {
+	if (loadingApt) {
+		window.setTimeout(checkLoadingApt, 100, input, newValue);
+	} else {
+		input.val(newValue).change();
 	}
 }
 
@@ -154,16 +175,31 @@ function setValueOfParam(params, key, newValue) {
 			pos += input.value_len;
 		});
 	} else if (typeof input == "string" || typeof input == "number") {
-		if (params[key] != newValue && key == "region_key") {
-			let region = gRegionsMap[newValue];
-			if (region) {
-				let level = region['level'];
-				let region_sel = $('#region_key'+level);
-				region_sel.val(newValue).change();
+		if (key == "region_key") {
+			let	region = gRegionsMap[newValue];
+			let level = region['level'];
+			let upper = [];
+			// find uper region recursivelly upward
+			for(var l = level; l > 0; l--) {
+				upper.push(region['key']);
+				region = gRegionsMap[region['upper']];
+			}
+			// set region control value downward
+			for(var l = 1; l <= level; l++) { 
+				let region_sel = $('#region_key'+l);
+				if (region_sel.val() != upper[level-l])
+					region_sel.val(upper[level-l]).change();
 			}
 		}
 		params[key] = newValue;
 	} else {
+		if (key == "apt") {
+			let region = gRegionsMap[$('#region_key3').val()];
+			if (!region || !region['subregions'] || region['subregions'].length == 0) {
+				window.setTimeout(checkLoadingApt, 100, input, newValue);
+				return;
+			}
+		}
 		input.val(newValue).change();
 	}
 }
@@ -224,6 +260,7 @@ function getChartParams() {
 function requestSaleStat() {
 
 	var params = getChartParams();
+	params['apt'] = '';
 
 	var title = getRegionTitle(params);
 
@@ -245,19 +282,23 @@ function requestRankChart(gubun) {
 	var params = getChartParams();
 
 	// Region Rank chart's minimum level = 2
-	if (gubun == 'Region' && gRegionsMap[params['region_key']]['level'] == 3)
-		params['region_key'] = gRegionsMap[params['region_key']]['upper'];
+	if (gubun == 'Region') {
+		if (gRegionsMap[params['region_key']]['level'] == 3)
+			params['region_key3'] = '';
+		params['apt'] = '';
+	}
 
 	drawRankChart(gubun, params);
 }
 
-function toggleTerms() {
-	if($('#toggle_term').is(':visible')) {
-		$('#toggle_term').hide();
-		$('#toggle_btn').text('▼ 보이기');
+function toggleView(anchor, divId) {
+	let div = $('#'+divId);
+	if(div.is(':visible')) {
+		div.hide();
+		$(anchor).text('▼ 보이기');
 	} else {
-		$('#toggle_term').show();
-		$('#toggle_btn').text('▲ 숨기기');
+		div.show();
+		$(anchor).text('▲ 숨기기');
 	}
 }
 
@@ -307,11 +348,11 @@ function closeMessage() {
 <div class="sidebar" style="width:200px; margin-left:5px;">
 	<div class="my-box" id="chart_conditions">
 	<label><strong>조회기간</strong></label><br>
-		<input id=from_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym', false);">▼</a> ~ 
+		<input id=from_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'from_ym', false);">▼</a>~
 		<input id=to_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'to_ym', true); return false;">▼</a><br>
+	<label><strong>지역/아파트 선택</strong></label><br>
 		<table>
 			<tr>
-				<td>시도</td>
 				<td>
 					<select child=region_key2 onchange="refreshRegion($(this));" id="region_key1" style="width:100%;">
 						<option value=''>전체</option>
@@ -319,7 +360,6 @@ function closeMessage() {
 				</td>
 			</tr>
 			<tr>
-				<td>시군구</td>
 				<td>
 					<select child=region_key3 onchange="refreshRegion($(this));" id="region_key2" style="width:100%;">
 						<option value=''>전체</option>
@@ -327,7 +367,6 @@ function closeMessage() {
 				</td>
 			</tr>
 			<tr>
-				<td>읍면동</td>
 				<td>
 					<select child=apt onchange="refreshRegion($(this));" id="region_key3" style="width:100%;">
 						<option value=''>전체</option>
@@ -335,17 +374,19 @@ function closeMessage() {
 				</td>
 			</tr>
 			<tr>
-				<td><input type=checkbox id=danji value=N disabled onchange="if (this.checked) this.value = 'Y'; else this.value = 'N'; refreshApt($('#apt'));" />단지만
-				</td>
 				<td>
 					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == '');">
 						<option value=''>전체</option>
 					</select>
 				</td>
 			</tr>
+			<tr>
+				<td><input type=checkbox id=danji value=N disabled onchange="if (this.checked) this.value = 'Y'; else this.value = 'N'; refreshApt($('#apt'));" />아파트 단지만 포함
+				</td>
+			</tr>
 		</table>
-		<span class="bar-item"><strong>추가 조건</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleTerms();" >▼ 보이기</a><br>
-		<div id=toggle_term style="display:none;">
+		<span class="bar-item"><strong>추가 조건</strong></span>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleView(this, 'detail_term');" >▼ 보이기</a><br>
+		<div id=detail_term style="display:none;">
 			<label>연식:</label>
 				<select id=ages>
 					<option value="">ALL</option>
@@ -365,20 +406,22 @@ function closeMessage() {
 		</div>
 	</div>
 	<div class="my-box">
-		<label><strong>평균평단가 추이</strong></label><br>
-		<button id='region_btn' onclick="requestSaleStat();">지역별 평균평단가 추이</button>
-		<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 평균평단가 추이</button>
+		<label><strong>평균평단가 추이 조회</strong></label><br>
+		<button id='region_btn' onclick="requestSaleStat();">지역별 추이</button>
+		<button id='apt_btn' onclick="requestSaleLine();" disabled>아파트별 추이</button>
 		<div id="draw_options">
-			<label><strong>차트 옵션</strong></label><br>
+			<label><strong>차트 옵션</strong></label>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleView(this, 'chart_option');" >▼ 보이기</a><br>
+			<div id=chart_option style="display:none;">
 			<input id=draw_overlap type=checkbox>겹쳐 그리기</input><br>
 			<input id=draw_relative type=checkbox onchange="updateChart();">상대수치로 보기</input><br>
-			<input id=draw_ma type=checkbox onchange="updateChart();">연간 이동평균 같이 보기</input><br>
+			<input id=draw_ma type=checkbox onchange="updateChart();">연간 이동평균 보기</input><br>
 			<input id=draw_volume type=checkbox onchange="updateChart();">거래량 같이 보기<br></input>
+			</div>
 		</div>
 	</div>
 	<div class="my-box" id="chart_conditions">
-		<label><strong>연간 평균평단가 비교</strong>(위에서 지역 선택)</label><br>
-			<input id=base_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS 
+		<label><strong>연간 평균평단가 비교</strong></label><br>
+			<input id=base_ym readOnly style="width:60px;"><a onclick="event.stopPropagation(); toggleYMTable($(this), 'base_ym', true);">▼</a> VS
 				<select id=years>
 					{%for i in range(1, 20)%} 
 					<option value={{i}}>{{i}}</option>
@@ -386,12 +429,16 @@ function closeMessage() {
 				</select>년전<br>
 			<button onclick="requestRankChart('Region');">지역별 순위</button><br>
 <!--			<button onclick="drawBoxPlotChart(getChartParams());">지역별 Box Plot</button><br> -->
-			<button onclick="requestRankChart('Apt');">아파트별 순위</button>
+			<button id='rankByAptBtn' onclick="requestRankChart('Apt');" disabled>아파트별 순위</button>
 
 	</div>
 	<div class="my-box">
-		<label>최근 작업 상황</label><br>
-		<span>{{result['ym']}} : {{result['start_dt']}} ~ {{result['end_dt']}} : {{result['status']}}</span>
+		<label>최근 작업</label>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleView(this, 'job_log');" >▼ 보이기</a><br>
+		<div id=job_log style="display:none;">
+		<span style="font-size:small">대상 년월 : {{result['ym']}}<br>
+		 작업 일시 : {{result['start_dt']}} ~ {{result['end_dt']}}<br>
+		 작업 상태 : {{result['status']}}</span>
+		</div>
 	</div>
 </div>
 <div id="ym_table_asc_div" class=popup style="display: none; position:absolute; z-index:999;">
