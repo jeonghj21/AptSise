@@ -36,6 +36,9 @@ logger.addHandler(fh)
 API_KEY = app.config['API_KEY']
 NUM_OF_ROWS = "1000"
 URL = "http://openapi.molit.go.kr/OpenAPI_ToolInstallPackage/service/rest/RTMSOBJSvc/getRTMSDataSvcAptTradeDev"
+MAX_RETRY = 3
+SLEEP_SEC = 3
+TIMEOUT_SEC = 5
 
 rows = 0
 
@@ -48,17 +51,15 @@ def get_items(item_list, lawdCd, Ymd, pageNo, job_key, columns):
 	success = False
 	while not success:
 		try:
-			response = requests.get(url)
+			response = requests.get(url, timeout = TIMEOUT_SEC)
 			content = response.content if response.status_code == 200 else ""
 			success = True
 		except Exception as e:
 			try_count = try_count + 1
-			if try_count == 5:
-				logger.error("Exceeding maximum retries... Exiting...")
+			if try_count == MAX_RETRY:
 				return -1
 			else:
-				time.sleep(3)
-
+				time.sleep(SLEEP_SEC)
 
 	root = None
 	try:
@@ -69,7 +70,7 @@ def get_items(item_list, lawdCd, Ymd, pageNo, job_key, columns):
 
 	header = root.find("header")
 	if header == None or header.find("resultCode").text != "00":
-		logger.error("Error response :", "header missing" if header == None else header.find("resultMsg").text)
+		logger.error("Error response :" + "header missing" if header == None else header.find("resultMsg").text)
 		return -1
 
 	for child in root.find('body').find('items'):
@@ -167,7 +168,7 @@ LOAD_INTO_TMP_RAW_DATA = """
 		(거래금액,@건축년도,년,도로명,도로명건물본번호코드,도로명건물부번호코드,도로명시군구코드,
 		도로명일련번호코드,도로명지상지하코드,도로명코드,법정동,법정동본번코드,법정동부번코드,
 		법정동시군구코드,법정동읍면동코드,법정동지번코드,아파트,월,일,일련번호,전용면적,지번, 지역코드, 층,해제사유발생일,해제여부, job_key, @vapt_id, ym)
-		set apt_id = nullif(@vapt_id, ''), 건축년도 = nullif(@건축년도, '')
+		set apt_id = nullif(@vapt_id, ''), 건축년도 = case when @건축년도 = '' then 1970 else @건축년도 end
 """
 
 INSERT_TMP_RAW_DATA2 = """
@@ -231,10 +232,14 @@ def get_and_load_data(job_key, ym, regions, columns):
 		else:
 			total_count += count
 
+	finally_failed_list = []
 	for res in failed_list:
 		count = get_items(items_list, res, ym, 1, job_key, columns)
-		if count > 0:
+		if count >= 0:
 			total_count += count
+		else:
+			finally_failed_list.append(res)
+			logger.error("Finally failed get_items : region = " + res)
 
 	items = pd.DataFrame(items_list) 
 
@@ -257,6 +262,14 @@ if to_ym == None:
 	to_ym = from_ym
 
 logger.info("SaleList Update Start : from_ym = " + from_ym + ", to_ym = " + to_ym)
+
+PID_FILE = app.config['BASE_DIR'] + "/sale_batch.pid"
+if os.path.isfile(PID_FILE):
+	logger.error("PID file already exists!! " + PID_FILE)
+	sys.exit(1)
+
+with open(PID_FILE, "w") as f:
+    f.write(str(os.getpid()))
 
 YYs = [from_ym[:4]]
 YMs.append(from_ym)
@@ -311,6 +324,8 @@ UPDATE_TMP_RAW_DATA2 = """
 		)
 	 where apt_id is null
 """
+
+SELECT_APT_ID_NULL = "select * from tmp_raw_data2_new where apt_id is null"
 
 INSERT_APT_SALE_NEW = """
 	insert into apt_sale_new
@@ -375,7 +390,8 @@ DELETE_APT_REGION_MA = "delete from apt_region_ma where ym between %s and date_f
 INSERT_APT_MA = """
 	insert into apt_ma_new
 		select * from (
-			select a.apt_id, b.ym, a.area_type, round(avg(a.price/(a.area/3.3)), 2) unit_price, count(*) cnt
+			select a.apt_id, b.ym, a.area_type
+				 , round(avg(a.price/(a.area/3.3)), 2) unit_price, round(avg(a.price), 2) price, count(*) cnt
 			  from tmp_ym b
 				 , apt_sale_new a
 				 , apt_master c
@@ -390,7 +406,8 @@ INSERT_APT_REGION_MA = """
 	insert into apt_region_ma
 		select * 
 		  from (
-    		select a.region_key, a.level, a.danji_flag, b.ym, a.made_year, a.area_type, round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, sum(a.cnt) cnt
+    		select a.region_key, a.level, a.danji_flag, b.ym, a.made_year, a.area_type
+				 , round(sum(a.unit_price*a.cnt)/sum(a.cnt), 2) unit_price, round(sum(a.price*a.cnt)/sum(a.cnt), 2) price, sum(a.cnt) cnt
 	      	  from tmp_ym b, apt_sale_stats a
 		 	 where b.ym between %s and date_format(date_add(str_to_date(concat(%s,'01'), '%Y%m%d'), interval 11 month), '%Y%m')
 		   	   and a.ym between date_format(date_sub(str_to_date(concat(b.ym,'01'), '%Y%m%d'), interval 11 month), '%Y%m') and b.ym
@@ -402,7 +419,8 @@ DELETE_APT_SALE_STATS_NEW = "delete from apt_sale_stats where ym = %s"
 
 INSERT_APT_SALE_STATS_ALL = """
 	insert into apt_sale_stats
-		select region_key, 3, made_year, area_type, ym, 'N', avg(price/(area/3.3)), count(*)
+		select region_key, 3, made_year, area_type, ym, 'N'
+			 , round(avg(price/(area/3.3)), 2) unit_price, round(avg(price), 2) price, count(*)
 	 	  from apt_sale_new a, apt_master b
 	 	 where a.apt_id = b.id and a.ym = %s
 	 	 group by region_key, made_year, area_type, ym
@@ -410,7 +428,8 @@ INSERT_APT_SALE_STATS_ALL = """
 
 INSERT_APT_SALE_STATS_DANJI_Y = """
 	insert into apt_sale_stats
-		select region_key, 3, made_year, area_type, ym, 'Y', avg(price/(area/3.3)), count(*)
+		select region_key, 3, made_year, area_type, ym, 'Y'
+			 , round(avg(price/(area/3.3)), 2) unit_price, round(avg(price), 2) price, count(*)
 	 	  from apt_sale_new a, apt_master b
 	 	 where a.apt_id = b.id and a.ym = %s and b.k_apt_id is not null
 	 	 group by region_key, made_year, area_type, ym
@@ -418,7 +437,8 @@ INSERT_APT_SALE_STATS_DANJI_Y = """
 
 INSERT_APT_SALE_STATS_LEVEL_2 = """
 	insert into apt_sale_stats
-		select r.upper_region, 2, made_year, area_type, ym, danji_flag, (sum(unit_price * cnt) / sum(cnt)), sum(cnt)
+		select r.upper_region, 2, made_year, area_type, ym, danji_flag
+			 , round((sum(unit_price * cnt) / sum(cnt)), 2), round((sum(price * cnt) / sum(cnt)), 2), sum(cnt)
 	 	  from apt_sale_stats a, region_info r
 	 	 where a.ym = %s
 		   and a.region_key = r.region_key
@@ -428,7 +448,8 @@ INSERT_APT_SALE_STATS_LEVEL_2 = """
 
 INSERT_APT_SALE_STATS_LEVEL_1 = """
 	insert into apt_sale_stats
-		select r.upper_region, 1, made_year, area_type, ym, danji_flag, (sum(unit_price * cnt) / sum(cnt)), sum(cnt)
+		select r.upper_region, 1, made_year, area_type, ym, danji_flag
+			 , round((sum(unit_price * cnt) / sum(cnt)), 2), round((sum(price * cnt) / sum(cnt)), 2), sum(cnt)
 	 	  from apt_sale_stats a, region_info r
 	 	 where a.ym = %s
 		   and a.region_key = r.region_key
@@ -438,7 +459,8 @@ INSERT_APT_SALE_STATS_LEVEL_1 = """
 
 INSERT_APT_SALE_STATS_LEVEL_0 = """
 	insert into apt_sale_stats
-		select '0000000000', 0, made_year, area_type, ym, danji_flag, (sum(unit_price * cnt) / sum(cnt)), sum(cnt)
+		select '0000000000', 0, made_year, area_type, ym, danji_flag
+			 , round((sum(unit_price * cnt) / sum(cnt)), 2), round((sum(price * cnt) / sum(cnt)), 2), sum(cnt)
 	 	  from apt_sale_stats a
 	 	 where a.ym = %s
 		   and a.level = 1
@@ -636,6 +658,10 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
 
+	rows = execute_dml(job_key, SELECT_APT_ID_NULL)
+	if rows < 0:
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+
 	rows = execute_dml(job_key, INSERT_RAW_DATA)
 	if rows < 0:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
@@ -664,4 +690,6 @@ for ym in YMs:
 	logger.info(ym + " : Completed(" + str(ym_end_dt - ym_start_dt) + ") : " + str(ins_cnt))
 
 logger.info("Completed!!")
+
+os.remove(PID_FILE)
 
