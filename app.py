@@ -124,7 +124,7 @@ def getAddConditions( params, required = {}, ignored = {} ):
 	print("getAddConditions : " + add_conditions)
 	return add_conditions 
 
-SELECT_APT_SALE_LIST = "select b.apt_id, b.ym, a.price price, b.price ma, a.uprice uprice, b.uprice uma, a.cnt"
+SELECT_APT_SALE_LIST = "select b.apt_id, b.ym, cast(a.price as double) price, b.price ma, a.uprice uprice, b.uprice uma, a.cnt"
 
 SELECT_APT_SALE_MA = """
 			 select ym, apt_id, round(sum(unit_price* cnt) / sum(cnt), 2) uprice, round(sum(price* cnt) / sum(cnt), 2) price
@@ -149,29 +149,7 @@ def getSale():
 	params = request.args.to_dict()
 	apt = params['apt']
 
-	"""
-	from_ym = params['from_ym']
-	to_ym = params['to_ym']
-	area_type = params['area_type']
-
-	add_conditions = ""
-	if from_ym != "":
-		add_conditions += " and ym >= '" + from_ym + "'"
-	if to_ym != "":
-		add_conditions += " and ym <= '" + to_ym + "'"
-
-	if area_type != "":
-		add_conditions += " and ("
-	pos = 0
-	while (len(area_type) > pos):
-		if (pos > 0):
-			add_conditions += " or "
-		add_conditions += " area_type = '" + area_type[pos:pos+2] + "'"
-		pos = pos + 2
-	if area_type != "":
-		add_conditions += ")"
-	"""
-	add_conditions = getAddConditions(params, { 'from_ym', 'to_ym' })
+	add_conditions = getAddConditions(params, { 'from_ym', 'to_ym' }, { 'danji' })
 
 	sql = SELECT_APT_SALE_LIST + " from (" + SELECT_APT_SALE_MA + add_conditions + SELECT_APT_SALE_MA_GROUP_BY + \
 		") b left outer join (" + SELECT_APT_SALE + add_conditions + SELECT_APT_SALE_GROUP_BY + ") a " + SELECT_APT_SALE_JOIN_ON 
@@ -277,7 +255,7 @@ def getAptSale():
 	apt = params['apt']
 	sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale_new"
 	sql += " where apt_id = " + apt 
-	sql += getAddConditions(params, { 'base_ym', 'area_type' })
+	sql += getAddConditions(params, { 'base_ym', 'area_type' }, { 'danji' })
 	sql += " order by saled"
 	print(sql)
 	with app.engine.connect() as connection:
