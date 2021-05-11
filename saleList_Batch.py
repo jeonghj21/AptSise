@@ -622,6 +622,7 @@ for ym in YMs:
 	execute_dml(job_key,"delete from tmp_ym where ym='"+ym+"'")
 	execute_dml(job_key,"insert into tmp_ym values('"+ym+"')")
 	execute_dml(job_key, "truncate tmp_raw_data2_new")
+	execute_dml(job_key, "truncate tmp_raw_data_error")
 
 	if reuse_tmp_data != True:
 		if execute_dml(job_key, "truncate tmp_raw_data_new") < 0:
