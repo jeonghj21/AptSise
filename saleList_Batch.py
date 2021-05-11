@@ -161,6 +161,7 @@ UPDATE_JOB_LOG_FAIL = """
 def job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key):
 	now = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
 	execute_dml(job_key, UPDATE_JOB_LOG_FAIL, (now, get_cnt, ins_cnt, del_cnt, apt_cnt, job_key), False)
+	os.remove(PID_FILE)
 	sys.exit(1)
 
 LOAD_INTO_TMP_RAW_DATA = """
