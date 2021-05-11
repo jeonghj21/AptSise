@@ -597,7 +597,7 @@ def update_qbox_stats(job_key, ym, get_cnt, ins_cnt, del_cnt, apt_cnt):
 	if rows < 0:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
 
-	execute_dml(job_key, "SET GROUP_CONCAT_MAX_LEN = 10485760")
+	execute_dml(job_key, "SET GROUP_CONCAT_MAX_LEN = 4294967295")
 	for i in range(0, 4):
 		sql = INSERT_QBOX_STATS_1 + QBOX_FROMs[i] + QBOX_WHEREs[i] + QBOX_END
 		rows = execute_dml(job_key, sql, (ym,))
