@@ -1,6 +1,7 @@
 *.log
 *.ini
 *.bak.*
+*.pid
 config_dev.py
 config.py
-
+tableexport.js
