@@ -1,0 +1,6 @@
+*.log
+*.ini
+*.bak.*
+config_dev.py
+config.py
+
