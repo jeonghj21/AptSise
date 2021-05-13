@@ -1,0 +1,652 @@
+[33mcommit 1a54dcb4bf9b95c68b8000eb1e7fc6893a097241[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Thu May 13 10:33:16 2021 +0900
+
+    .gitignore 적용
+
+[33mcommit 2592dbe09acd49d5275e6fe21734e06945e8b1d9[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed May 12 14:51:57 2021 +0900
+
+    adding more files to gitignore
+
+[33mcommit da832b8e0247ee38848ddb60f04b3fd2f23289ad[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed May 12 14:48:13 2021 +0900
+
+    gitignore
+
+[33mcommit caaa369a86819cd05e063bfec9cb465cf0041f22[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue May 11 17:47:16 2021 +0900
+
+    v0.81
+
+[33mcommit 01f90af43c96f425f5364cb03698a962e7435186[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue May 11 12:36:44 2021 +0900
+
+    v0.8
+
+[33mcommit 92c4f53c668c72ee60928cc787fc9950b0b9038c[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue May 11 11:35:28 2021 +0900
+
+    v0.8
+
+[33mcommit 91699cceeb6a2b1c3a6c44463a33d93788aadf2f[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue May 11 11:10:47 2021 +0900
+
+    v0.8
+
+[33mcommit ff425200316df9a7cf0eb17cb2145fc5d7bcb8f6[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue May 11 10:42:41 2021 +0900
+
+    v0.8
+
+[33mcommit 4c11cd36c2bcd3c0430dff2148002bbd88be1693[m[33m ([m[1;31morigin/dev0.8[m[33m, [m[1;32mdev0.8[m[33m)[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue May 11 09:59:29 2021 +0900
+
+    v0.8
+
+[33mcommit 54ce5f03e903a813c37eeed17859ba0e8286aa33[m
+Merge: e19aa16 f6fcc58
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Apr 4 10:17:17 2021 +0900
+
+    Merge branch 'dev0.7'
+
+[33mcommit f6fcc582e800850f7d73e366b82ad137d3c105bc[m[33m ([m[1;31morigin/dev0.7[m[33m, [m[1;32mdev0.7[m[33m)[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Apr 4 10:11:46 2021 +0900
+
+    v0.71
+
+[33mcommit e19aa1671b60458e662e76010877f702649ca812[m
+Merge: 8f1f43b faed2b0
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Apr 2 15:08:46 2021 +0900
+
+    Merge branch 'dev0.7'
+
+[33mcommit faed2b02242af757697485a77b1411b39a2e8ebb[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Apr 2 15:08:06 2021 +0900
+
+    v0.7
+
+[33mcommit af46d78cb04c93d4caa3925d3e0815ec93706519[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Apr 2 14:54:07 2021 +0900
+
+    v0.7
+
+[33mcommit 8f1f43b4ccc7300249e9c71dc35ea71569a344c0[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Thu Apr 1 11:13:33 2021 +0900
+
+    v0.7
+
+[33mcommit c76dfccf498204dbdf01974c87243918b0248ffa[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Thu Apr 1 11:03:02 2021 +0900
+
+    v0.7
+
+[33mcommit a9471809e5a70f6504160460fab8938632aa4b77[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Tue Mar 30 10:15:08 2021 +0900
+
+    Add files via upload
+
+[33mcommit 8b776907c60cf2d7b8cf1ff836f13f9ac71e35e3[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Mon Mar 29 17:41:13 2021 +0900
+
+    Add files via upload
+
+[33mcommit 3ff5be613abde0a5f42ed3c8b1b3fa0e681388a2[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Fri Mar 26 17:34:13 2021 +0900
+
+    Add files via upload
+
+[33mcommit c86c20c5fe99753df074b056e37c0ab1a2cf8dbb[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Fri Mar 26 17:33:55 2021 +0900
+
+    Delete batch.sql
+
+[33mcommit 3255acc64aeec8b14f223b00eedd4d944f63a1a0[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Fri Mar 26 17:33:20 2021 +0900
+
+    Add files via upload
+
+[33mcommit 885f848a998462af27e4fe86392af94b4af42dd8[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Tue Mar 16 21:59:36 2021 +0900
+
+    Add files via upload
+
+[33mcommit ef8c4d5f90b1ba6f665ff6afa7f58283237cd00b[m
+Merge: 9d036ca 6ac94df
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Mar 5 17:44:52 2021 +0900
+
+    Merge branch 'dev0.7' of https://github.com/jeonghj21/AptSise into dev0.7
+
+[33mcommit 9d036ca56425fee92ea6bbbf6aba5d17b719c881[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Mar 5 17:44:16 2021 +0900
+
+    test
+
+[33mcommit ee1c85d7f43983b18fb5985273c4d2088f1ec107[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Mar 5 17:41:36 2021 +0900
+
+    test
+
+[33mcommit 6ac94dfcffb2411cad35d6d9471b80bf177e5a83[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Fri Mar 5 13:53:33 2021 +0900
+
+    Create release.txt
+
+[33mcommit 6ad2f41424c8425327d25a97d394804e34d7492d[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Mar 5 09:15:21 2021 +0900
+
+    test
+
+[33mcommit 8f250a37b03126f186cb2e0661ffb2076b4083db[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Thu Mar 4 16:45:23 2021 +0900
+
+    test data
+
+[33mcommit 8b8ec2b11f1ae2fb29022d53220d14f2c17a9602[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Tue Mar 2 14:00:04 2021 +0900
+
+    Add files via upload
+
+[33mcommit 13e35af9f38091cc75a49e176fafe6b7326f39d4[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Tue Mar 2 13:54:40 2021 +0900
+
+    Add files via upload
+
+[33mcommit aa9aa2d225fe13fcb0a94b094b3efc3e82e3e5f2[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 15:06:41 2021 +0900
+
+    image test
+
+[33mcommit 35fda2aa3b9bcf603caa7d44569e547ab89aa5f8[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 15:05:47 2021 +0900
+
+    image test
+
+[33mcommit 5f389264ca5729b294a39477e4646ca88f0df0db[m
+Merge: 90130a8 84d7f31
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 15:04:32 2021 +0900
+
+    Merge branch 'master' of https://github.com/jeonghj21/AptSise
+
+[33mcommit 90130a834bff7702a56fa4a68a65571ed8652599[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 15:04:01 2021 +0900
+
+    image test
+
+[33mcommit 84d7f3154ae1959fc40261f0eeb56a1ea326bf00[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Mon Mar 1 15:02:46 2021 +0900
+
+    Add files via upload
+
+[33mcommit d5f6aeedfd08337fe3280c0bb6eb61c78500d90a[m
+Merge: 4d09264 d46fe72
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 14:23:39 2021 +0900
+
+    Merge branch 'master' of https://github.com/jeonghj21/AptSise
+
+[33mcommit 4d09264ab9c04e15adfca8361fb4f374a9f09e56[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 14:22:54 2021 +0900
+
+    image test
+
+[33mcommit 28635a6054dad0ebbaffa0b34eb503654b204bc7[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 14:17:12 2021 +0900
+
+    image test
+
+[33mcommit d46fe72c19c75118bbeef30bda018430aea97fb8[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Mon Mar 1 13:47:03 2021 +0900
+
+    Add files via upload
+
+[33mcommit 6f15c98bf13c8e794eed85746834228faa08d299[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Mar 1 13:34:49 2021 +0900
+
+    image test
+
+[33mcommit c41565a011293e95ec131cb7f81c54ee90952f4a[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Feb 28 16:22:57 2021 +0900
+
+    v0.65
+
+[33mcommit bee4b58385a3786f44bf10ef026907d21f235a60[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sat Feb 27 13:54:00 2021 +0900
+
+    v0.65
+
+[33mcommit 9a8d7b5d5898062594597577863af325954a8d04[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sat Feb 27 12:00:25 2021 +0900
+
+    v0.65
+
+[33mcommit bfd431f14b4692211511c540e35dffa8d857775d[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Feb 26 16:32:56 2021 +0900
+
+    v0.65
+
+[33mcommit 39e70a11127f681ea0f4556b555543c7354f086e[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Feb 26 10:37:00 2021 +0900
+
+    v0.65
+
+[33mcommit 35d76b6676c7b03b5a8ded5d948861e44d879ced[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Thu Feb 25 22:02:06 2021 +0900
+
+    v0.65
+
+[33mcommit 0e31d10fca67f6213c5293e803848ab3d72a2502[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Feb 24 06:36:04 2021 +0900
+
+    v0.65
+
+[33mcommit 49372049f7cf2f14c2076f96188b3acf3eea8ce1[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Feb 24 06:33:42 2021 +0900
+
+    v0.65
+
+[33mcommit 317803a8c21deb7ea6bae866975f203728f794d9[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Feb 23 17:18:09 2021 +0900
+
+    v0.65
+
+[33mcommit c934a58eec74050a2f59ee147cfcf8dd9e3c7e83[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Feb 23 13:59:15 2021 +0900
+
+    v0.65
+
+[33mcommit 156a9220e258397b239fbda37d36ff8cb3f42df4[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Feb 22 22:34:31 2021 +0900
+
+    v0.65
+
+[33mcommit 1a6cb2d3c8c33680e3ba009b9e5d0d7c0e92ab26[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Feb 22 22:17:38 2021 +0900
+
+    v0.65
+
+[33mcommit dc3b95ba9f8a5f453a50ea9a14b66b224f7c3e7c[m
+Merge: 7994211 7a8915f
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Feb 17 13:03:12 2021 +0900
+
+    Merge remote-tracking branch 'origin/dev'
+
+[33mcommit 7a8915f474484afe04a47624300a1103ad97a2a4[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Feb 17 13:02:21 2021 +0900
+
+    0.62
+
+[33mcommit 79942111927eb77e17bb8944ed510691db35ecb7[m
+Merge: fd4e605 4f3697a
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Feb 17 10:37:38 2021 +0900
+
+    Merge remote-tracking branch 'origin/dev'
+
+[33mcommit 4f3697a7eebd8160b554d9bca343e21f015ec149[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Feb 17 10:36:16 2021 +0900
+
+    0.62
+
+[33mcommit fd4e605eb35fb0da8478b98c49ac57058097e00a[m
+Merge: df15325 ed9e23b
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Feb 16 22:44:59 2021 +0900
+
+    Merge remote-tracking branch 'origin/dev'
+
+[33mcommit ed9e23bd01a4c0c9c4c59d738c76e20bf542156f[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Feb 16 22:37:15 2021 +0900
+
+    0.62
+
+[33mcommit df15325b89a7b7db73f005f7f138c148eec9f676[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Feb 16 12:52:39 2021 +0900
+
+    0.62
+
+[33mcommit f371d20e3a7d12ba4ae055923905e984a6b79a2b[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Feb 16 10:18:37 2021 +0900
+
+    0.62
+
+[33mcommit 5f5054459037c804d0efc77793daa3940b35920a[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Feb 15 18:23:39 2021 +0900
+
+    0.611
+
+[33mcommit 6404fc19813f723710c5d04272292f7d3eb47bd3[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Feb 15 18:06:48 2021 +0900
+
+    0.61
+
+[33mcommit 60dedc68d34f6aba7ce9076327efffc8faf69d70[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Jan 29 17:29:57 2021 +0900
+
+    v0.6
+
+[33mcommit 0d9d62883627e904f0dc23965f40de00c6641316[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Jan 20 16:51:57 2021 +0900
+
+    export
+
+[33mcommit f9acf58caae29f034b2a5c3d94ab341baf160c96[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Jan 20 11:28:22 2021 +0900
+
+    export
+
+[33mcommit 3a5415ed6909871ce48ef81e1295c5ee219740f7[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Jan 18 17:34:26 2021 +0900
+
+    updating several sources...
+
+[33mcommit aac01b358da777d9f1c5ea1974e91dc957ff5a15[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Tue Jan 12 10:59:52 2021 +0900
+
+    updating icon images
+
+[33mcommit c30f26fd7963b429302732488b6c2b5ae4ab57ed[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Jan 12 09:52:15 2021 +0900
+
+    adding icon image
+
+[33mcommit a672f2c4a1c56ed2290d4c94421862719d1c201c[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Tue Jan 12 09:50:32 2021 +0900
+
+    Add files via upload
+
+[33mcommit 8318a2268ecfaa00490179e01032cc78b9e10158[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Jan 12 09:44:44 2021 +0900
+
+    0.5 버젼
+
+[33mcommit 8798c936754447fb18cc5df494166ab27d0563ad[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Thu Dec 31 15:13:30 2020 +0900
+
+    Add files via upload
+
+[33mcommit 613108716c1c5bdffe90315e505ea7e74028bcfd[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Dec 20 11:50:36 2020 +0900
+
+    0.4 버젼 완성
+
+[33mcommit e5151a3cb64210bb3e54ba9f2cc79073d9f782b1[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Dec 16 13:56:23 2020 +0900
+
+    데이터 현행화 작업 등록
+
+[33mcommit 50299e112c8f7fb6a19d846e09969e229d094a42[m
+Author: jeonghj21 <45685055+jeonghj21@users.noreply.github.com>
+Date:   Sun Dec 13 06:02:11 2020 +0900
+
+    202010~12 실거래 데이터 추가
+
+[33mcommit 1e7759574e224535ef7ec0b4c8f5c14a1800142d[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Dec 13 05:35:49 2020 +0900
+
+    추가 아파트 실거래 데이터
+
+[33mcommit f3b1095952edc6f270300cbf613474c6479034b7[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Dec 11 18:14:01 2020 +0900
+
+    데이터 현행화 배치 0.1버젼
+
+[33mcommit df239bd16b21a3c8d4579d26f72c512c40101e68[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Thu Dec 10 18:08:07 2020 +0900
+
+    apt_master 중복 제거용 쿼리
+
+[33mcommit 68de7c5139e0edb09bc4d0220027fd7fe5d474da[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Dec 9 18:05:36 2020 +0900
+
+    아파트별 6개월 이동평균 데이터 및 옵션 추가
+
+[33mcommit 1ad49e3b28ced393ea1d1ef418ad05d520fca1f9[m
+Merge: 907e9fa 193a7b3
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Dec 9 12:20:09 2020 +0900
+
+    Merge branch 'master' of https://github.com/jeonghj21/AptSise
+
+[33mcommit 193a7b358ffda2d1fe1a4596464544041c11142a[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Wed Dec 9 12:19:10 2020 +0900
+
+    KB 데이터 로딩용 화일
+
+[33mcommit 907e9fa870608edab4c4d41f6ce59d1e6d7854f2[m
+Merge: d70c0eb cb0883f
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Dec 9 12:03:20 2020 +0900
+
+    Merge branch 'master' of https://github.com/jeonghj21/AptSise
+
+[33mcommit d70c0eb98099b486b0c7af58c8ce7c2834eedab4[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Wed Dec 9 12:02:06 2020 +0900
+
+    중간 커밋
+
+[33mcommit cb0883fcc68470d9526e2f6b8fd5c5f9ecac5f17[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Wed Dec 9 11:59:07 2020 +0900
+
+    KB 아파트 지수 데이터 추가
+
+[33mcommit f83c9580ebfcac969d5767d60321f517bac61aca[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Wed Dec 9 11:57:55 2020 +0900
+
+    csv 화일을 data 디렉토리로 이동
+
+[33mcommit 697939cfcd08354e8eb454bc630a9ab16e40dc29[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Tue Dec 8 18:20:43 2020 +0900
+
+    버전 0.3
+
+[33mcommit 4e1c3774981b55f0faac9dfa3cc9a7ed4be58c5f[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Dec 7 18:23:01 2020 +0900
+
+    상대수치포 차트 그리기
+
+[33mcommit 062da57867ecc644cf5e255bf4b31449da4b6356[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Fri Dec 4 18:14:55 2020 +0900
+
+    챠트 겹쳐보기 및 각종 변경사항
+
+[33mcommit 7249ffad0b0f8d79f6bebd754cdf6aee6e0001fe[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Thu Dec 3 17:59:14 2020 +0900
+
+    전용면적 조건을 다중으로
+
+[33mcommit 519c7d6cf56d25b237031271529203aeaf609148[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Wed Dec 2 18:01:14 2020 +0900
+
+    아파트 마스터 데이터 추가
+
+[33mcommit 18cc14e3219788ce2087cb031ac906a38333a9e5[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Nov 29 12:07:00 2020 +0900
+
+    페이지 제목 수정
+
+[33mcommit 8cc63d8fc8a0b65fa646a7385c799f70d2d862ad[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Nov 29 11:58:18 2020 +0900
+
+    수정
+
+[33mcommit fd40d7e4a4b2d490a755a2adeb7730e871560d04[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Nov 29 11:49:09 2020 +0900
+
+    v0.2 완성
+
+[33mcommit 1ceb864e66a638ebe2e484e8109c25352d5fa652[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Sun Nov 29 11:40:40 2020 +0900
+
+    통계 조건 1차 완성
+
+[33mcommit dec926219852990a83514a1ca39d9b560ed97a02[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Fri Nov 27 18:12:11 2020 +0900
+
+    통계 조회 조건 설정
+
+[33mcommit 2a49d2079817755c002ed4e0e9b7d71f05764305[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Nov 27 17:20:52 2020 +0900
+
+    조회 조건 수정
+
+[33mcommit 9b9bccc124831826dbfe78a54caa7b73f734162a[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Fri Nov 27 17:20:01 2020 +0900
+
+    통계 테이블 쿼리 수정
+
+[33mcommit 91ec02b83d6076fe00e4236f4de596e98f301c91[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Wed Nov 25 18:19:53 2020 +0900
+
+    통계테이블 수정
+
+[33mcommit dc63a2e193beef364acbc3bdb27d6ebf0eba3d14[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Tue Nov 24 18:12:26 2020 +0900
+
+    통계테이블 추가 및 통계차트 추가
+
+[33mcommit 030937ff0a4d2dc3e02b4740934bdfe63e30c42e[m
+Merge: b2f5028 a949a3b
+Author: jhj <jeonghj21@gmail.com>
+Date:   Mon Nov 23 18:17:52 2020 +0900
+
+    Merge branch 'master' of https://github.com/jeonghj21/AptSise
+
+[33mcommit b2f502831b5b6f360bd5e7ac11eee0f8f7cd0c40[m
+Author: jhj <jeonghj21@gmail.com>
+Date:   Mon Nov 23 18:13:53 2020 +0900
+
+    평형 컬럼과 평균 테이블 추가
+
+[33mcommit a949a3b46b863d4a2311297994c131842487be95[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 9 17:23:25 2020 +0900
+
+    onclick 추가
+
+[33mcommit 5f89b61ac3d60e5e5a4bb421ec5b9f75dd4aafe6[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 9 17:09:02 2020 +0900
+
+    commit
+
+[33mcommit 9f57953bd18bb2d0ff68635b1bc886f2ebb80faa[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 9 17:00:40 2020 +0900
+
+    BASE_URL  수정
+
+[33mcommit 7be27866f974eb2f4a8ac296b7d05a3bca13a5a9[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 2 17:53:30 2020 +0900
+
+    Initial Commit
+
+[33mcommit 8974e8cf4fd54eba58296e39188467fed141e44c[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 2 16:57:24 2020 +0900
+
+    Initial Commit
+
+[33mcommit 8be247df4ba5b32464c208e454ec78494ffcb3b2[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 2 16:43:00 2020 +0900
+
+    Initial Commit
+
+[33mcommit ee754d746c0911105d284b7d1c0454de6cf28a71[m
+Author: jeonghj21 <jeonghj21@gmail.com>
+Date:   Mon Nov 2 16:41:54 2020 +0900
+
+    Initial commit

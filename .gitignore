@@ -2,6 +2,7 @@
 *.ini
 *.bak.*
 *.pid
-config_dev.py
-config.py
+config*.py
 tableexport.js
+wsgi.py
+__pycache__/

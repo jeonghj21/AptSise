@@ -169,7 +169,7 @@ LOAD_INTO_TMP_RAW_DATA = """
 		(거래금액,@건축년도,년,도로명,도로명건물본번호코드,도로명건물부번호코드,도로명시군구코드,
 		도로명일련번호코드,도로명지상지하코드,도로명코드,법정동,법정동본번코드,법정동부번코드,
 		법정동시군구코드,법정동읍면동코드,법정동지번코드,아파트,월,일,일련번호,전용면적,지번, 지역코드, 층,해제사유발생일,해제여부, job_key, @vapt_id, ym)
-		set apt_id = nullif(@vapt_id, ''), 건축년도 = case when @건축년도 = '' then 1970 else @건축년도 end
+		set apt_id = nullif(@vapt_id, ''), 건축년도 = case when @건축년도 = '' then 1900 else @건축년도 end
 """
 
 INSERT_TMP_RAW_DATA2 = """
@@ -220,6 +220,15 @@ UPDATE_TMP_RAW_REGION_LEVEL5 = """
 		  from tmp_raw_data_error 
 		 where level = 5
 		)
+"""
+
+UPDATE_TMP_RAW_MADE_YEAR = """
+	update tmp_raw_data_new a set 건축년도 = (
+		select made_year from apt_master 
+			where apt_name = a.아파트 and region_key = concat(법정동시군구코드,법정동읍면동코드) and road_cd = 도로명코드
+			order by id limit 1
+		)
+		where 건축년도 = 1900
 """
 
 def get_and_load_data(job_key, ym, regions, columns):
@@ -285,7 +294,9 @@ while from_ym < to_ym:
 	if YYs[len(YYs)-1] != from_ym[:4]:
 		YYs.append(from_ym[:4])
 
-sql = "select case when substr(region_key, 1, 5) = '36111' then '36110' else substr(region_key,1,5) end as region_cd from region_info where level=2"
+#sql = "select case when substr(region_key, 1, 5) = '36111' then '36110' else substr(region_key,1,5) end as region_cd from region_info where level=2"
+sql = "select case when substr(region_key, 1, 5) = '36111' then '36110' else substr(region_key,1,5) end as region_cd \
+	from region_info where substr(region_key,3,1) <> '0' and substr(region_key,6,1) = '0'"
 with app.engine.connect() as connection:
 	result = connection.execute(text(sql))
 
@@ -633,8 +644,6 @@ for ym in YMs:
 		get_cnt = get_and_load_data(job_key, ym, regions, columns);
 		logger.info("get_and_load Completed(" + str(datetime.datetime.now() - start_dt) + ") : " + str(get_cnt))
 
-		logger.info("update invalid region cod : " + str(datetime.datetime.now() - start_dt) + ") : " + str(get_cnt))
-
 		if execute_dml(job_key, "update tmp_raw_data_new set 법정동시군구코드 = '36111' where 법정동시군구코드 = '36110'") < 0:
 			job_fail(get_cnt, 0, 0, 0, job_key)
 		if execute_dml(job_key, "update tmp_raw_data_new set 법정동읍면동코드 = '32000' where 법정동시군구코드 = '41461' and (법정동읍면동코드 = '25931')") < 0:
@@ -647,9 +656,11 @@ for ym in YMs:
 				logger.error("CHCK!!! tmp_raw_data_error Not All Updated : invalid = " + str(rows) + ", updated = " + str(update4 + update5))
 				job_fail(get_cnt, 0, 0, 0, job_key)
 
-	if execute_dml(job_key, INSERT_TMP_RAW_DATA2, (ym,)) < 0:
+	if execute_dml(job_key, UPDATE_TMP_RAW_MADE_YEAR) < 0:
 		job_fail(get_cnt, 0, 0, 0, job_key)
 
+	if execute_dml(job_key, INSERT_TMP_RAW_DATA2, (ym,)) < 0:
+		job_fail(get_cnt, 0, 0, 0, job_key)
 
 	rows = execute_dml(job_key, INSERT_APT_MASTER_NEW)
 	if rows < 0:
@@ -661,7 +672,8 @@ for ym in YMs:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
 
 	rows = execute_dml(job_key, SELECT_APT_ID_NULL)
-	if rows < 0:
+	if rows != 0:
+		logger.error("CHCK!!! apt_id null exists : " + str(rows))
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
 
 	rows = execute_dml(job_key, INSERT_RAW_DATA)
