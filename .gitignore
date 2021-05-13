@@ -5,3 +5,5 @@
 config_dev.py
 config.py
 tableexport.js
+wsgi.py
+
