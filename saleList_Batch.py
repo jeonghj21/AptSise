@@ -158,10 +158,18 @@ UPDATE_JOB_LOG_FAIL = """
 	 where job_key = %s
 """
 
-def job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key):
+def job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym):
 	now = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
 	execute_dml(job_key, UPDATE_JOB_LOG_FAIL, (now, get_cnt, ins_cnt, del_cnt, apt_cnt, job_key), False)
 	os.remove(PID_FILE)
+	execute_dml(job_key, "delete from raw_data_new where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_sale_new where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_master where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_sale_stats where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_ma_new where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_region_ma where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_qbox_stats where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_sale_deleted where ym = %s", (ym,))
 	sys.exit(1)
 
 LOAD_INTO_TMP_RAW_DATA = """
@@ -169,7 +177,7 @@ LOAD_INTO_TMP_RAW_DATA = """
 		(거래금액,@건축년도,년,도로명,도로명건물본번호코드,도로명건물부번호코드,도로명시군구코드,
 		도로명일련번호코드,도로명지상지하코드,도로명코드,법정동,법정동본번코드,법정동부번코드,
 		법정동시군구코드,법정동읍면동코드,법정동지번코드,아파트,월,일,일련번호,전용면적,지번, 지역코드, 층,해제사유발생일,해제여부, job_key, @vapt_id, ym)
-		set apt_id = nullif(@vapt_id, ''), 건축년도 = case when @건축년도 = '' then 1970 else @건축년도 end
+		set apt_id = nullif(@vapt_id, ''), 건축년도 = if(ifnull(@건축년도, '') = '', 1900, @건축년도)
 """
 
 INSERT_TMP_RAW_DATA2 = """
@@ -222,7 +230,24 @@ UPDATE_TMP_RAW_REGION_LEVEL5 = """
 		)
 """
 
-def get_and_load_data(job_key, ym, regions, columns):
+UPDATE_TMP_RAW_MADE_YEAR1 = """
+	update tmp_raw_data_new a set 건축년도 = (
+		select made_year from apt_master
+			where region_key = concat(a.법정동시군구코드, a.법정동읍면동코드)
+			  and apt_name = a.아파트
+			  and road_cd = a.도로명코드
+			order by id
+			limit 1
+		)
+		where 건축년도 = 1900
+"""
+
+UPDATE_TMP_RAW_MADE_YEAR2 = """
+	update tmp_raw_data_new a set 건축년도 = 1990
+		where 건축년도 is null
+"""
+
+def get_and_load_data(job_key, ym, regions, columns, fname):
 	total_count = 0
 	items_list = []
 	failed_list = []
@@ -244,13 +269,10 @@ def get_and_load_data(job_key, ym, regions, columns):
 
 	items = pd.DataFrame(items_list) 
 
-	fname = os.path.join(app.config['BASE_DIR'], "%s_%s.csv" %(ym, job_key))
 	items.to_csv(fname, index=False,encoding="utf-8")
 
 	if execute_dml(job_key, LOAD_INTO_TMP_RAW_DATA, (fname,)) < 0:
-		job_fail(total_count, 0, 0, 0, job_key)
-
-	os.remove(fname)
+		job_fail(total_count, 0, 0, 0, job_key, ym)
 
 	return total_count
 
@@ -285,7 +307,9 @@ while from_ym < to_ym:
 	if YYs[len(YYs)-1] != from_ym[:4]:
 		YYs.append(from_ym[:4])
 
-sql = "select case when substr(region_key, 1, 5) = '36111' then '36110' else substr(region_key,1,5) end as region_cd from region_info where level=2"
+#sql = "select case when substr(region_key, 1, 5) = '36111' then '36110' else substr(region_key,1,5) end as region_cd from region_info where level=2"
+sql = "select case when substr(region_key, 1, 5) = '36111' then '36110' else substr(region_key,1,5) end as region_cd \
+	from region_info where substr(region_key,3,1) <> '0' and substr(region_key,6,1) = '0'"
 with app.engine.connect() as connection:
 	result = connection.execute(text(sql))
 
@@ -307,7 +331,7 @@ INSERT_JOB_LOG = "insert into job_log values(%s, %s, %s, str_to_date(%s, '%Y%m%d
 
 INSERT_APT_MASTER_NEW = """
 	insert into apt_master 
-	select null, concat(법정동시군구코드, 법정동읍면동코드), 아파트, 도로명코드, 건축년도, null, null
+	select null, concat(법정동시군구코드, 법정동읍면동코드), 아파트, 도로명코드, 건축년도, null, null, %s
         from tmp_raw_data2_new
        where (건축년도, concat(법정동시군구코드, 법정동읍면동코드), 도로명코드, 아파트)
         not in (select made_year, region_key, road_cd, apt_name from apt_master)
@@ -420,20 +444,20 @@ DELETE_APT_SALE_STATS_NEW = "delete from apt_sale_stats where ym = %s"
 
 INSERT_APT_SALE_STATS_ALL = """
 	insert into apt_sale_stats
-		select region_key, 3, made_year, area_type, ym, 'N'
+		select region_key, 3, made_year, area_type, a.ym, 'N'
 			 , round(avg(price/(area/3.3)), 2) unit_price, round(avg(price), 2) price, count(*)
 	 	  from apt_sale_new a, apt_master b
 	 	 where a.apt_id = b.id and a.ym = %s
-	 	 group by region_key, made_year, area_type, ym
+	 	 group by region_key, made_year, area_type, a.ym
 """
 
 INSERT_APT_SALE_STATS_DANJI_Y = """
 	insert into apt_sale_stats
-		select region_key, 3, made_year, area_type, ym, 'Y'
+		select region_key, 3, made_year, area_type, a.ym, 'Y'
 			 , round(avg(price/(area/3.3)), 2) unit_price, round(avg(price), 2) price, count(*)
 	 	  from apt_sale_new a, apt_master b
 	 	 where a.apt_id = b.id and a.ym = %s and b.k_apt_id is not null
-	 	 group by region_key, made_year, area_type, ym
+	 	 group by region_key, made_year, area_type, a.ym
 """
 
 INSERT_APT_SALE_STATS_LEVEL_2 = """
@@ -553,63 +577,63 @@ def update_stats(job_key, ym, get_cnt, ins_cnt, del_cnt, apt_cnt):
 
 	rows = execute_dml(job_key, DELETE_APT_SALE_STATS_NEW, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_ALL, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_DANJI_Y, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_LEVEL_2, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_LEVEL_1, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_STATS_LEVEL_0, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, DELETE_APT_MA, (ym, ym))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_MA, (ym, ym))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, DELETE_APT_REGION_MA, (ym, ym))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_REGION_MA, (ym, ym))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 
 def update_qbox_stats(job_key, ym, get_cnt, ins_cnt, del_cnt, apt_cnt):
 
 	rows = execute_dml(job_key, "delete from apt_qbox_stats where ym = %s", (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	execute_dml(job_key, "SET GROUP_CONCAT_MAX_LEN = 4294967295")
 	for i in range(0, 4):
 		sql = INSERT_QBOX_STATS_1 + QBOX_FROMs[i] + QBOX_WHEREs[i] + QBOX_END
 		rows = execute_dml(job_key, sql, (ym,))
 		if rows < 0:
-			job_fail(0, 0, del_cnt, 0, job_key)
+			job_fail(0, 0, del_cnt, 0, job_key, ym)
 
 	for i in range(0, 4):
 		sql = INSERT_QBOX_STATS_2 + QBOX_FROMs[i] + QBOX_WHEREs[i] + QBOX_END
 		rows = execute_dml(job_key, sql, (ym,))
 		if rows < 0:
-			job_fail(0, 0, del_cnt, 0, job_key)
+			job_fail(0, 0, del_cnt, 0, job_key, ym)
 
 for ym in YMs: 
 	ym_start_dt = datetime.datetime.now()
@@ -624,62 +648,67 @@ for ym in YMs:
 	execute_dml(job_key, "truncate tmp_raw_data2_new")
 	execute_dml(job_key, "truncate tmp_raw_data_error")
 
+	CSV_FILE = os.path.join(app.config['BASE_DIR'], "%s_%s.csv" %(ym, job_key))
 	if reuse_tmp_data != True:
 		if execute_dml(job_key, "truncate tmp_raw_data_new") < 0:
-			job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+			job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 		start_dt = datetime.datetime.now()
 		logger.info("get_and_load starting...")
-		get_cnt = get_and_load_data(job_key, ym, regions, columns);
+		get_cnt = get_and_load_data(job_key, ym, regions, columns, CSV_FILE);
 		logger.info("get_and_load Completed(" + str(datetime.datetime.now() - start_dt) + ") : " + str(get_cnt))
 
-		logger.info("update invalid region cod : " + str(datetime.datetime.now() - start_dt) + ") : " + str(get_cnt))
-
 		if execute_dml(job_key, "update tmp_raw_data_new set 법정동시군구코드 = '36111' where 법정동시군구코드 = '36110'") < 0:
-			job_fail(get_cnt, 0, 0, 0, job_key)
+			job_fail(get_cnt, 0, 0, 0, job_key, ym)
 		if execute_dml(job_key, "update tmp_raw_data_new set 법정동읍면동코드 = '32000' where 법정동시군구코드 = '41461' and (법정동읍면동코드 = '25931')") < 0:
-			job_fail(get_cnt, 0, 0, 0, job_key)
+			job_fail(get_cnt, 0, 0, 0, job_key, ym)
 		rows = execute_dml(job_key, INSERT_RAW_DATA_ERROR)
 		if rows > 0:
 			update4 = execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL4)
 			update5 = execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL5)
 			if rows > update4 + update5:
 				logger.error("CHCK!!! tmp_raw_data_error Not All Updated : invalid = " + str(rows) + ", updated = " + str(update4 + update5))
-				job_fail(get_cnt, 0, 0, 0, job_key)
+				job_fail(get_cnt, 0, 0, 0, job_key, ym)
+
+	if execute_dml(job_key, UPDATE_TMP_RAW_MADE_YEAR1) < 0:
+		job_fail(get_cnt, 0, 0, 0, job_key, ym)
+
+	if execute_dml(job_key, UPDATE_TMP_RAW_MADE_YEAR2) < 0:
+		job_fail(get_cnt, 0, 0, 0, job_key, ym)
 
 	if execute_dml(job_key, INSERT_TMP_RAW_DATA2, (ym,)) < 0:
-		job_fail(get_cnt, 0, 0, 0, job_key)
+		job_fail(get_cnt, 0, 0, 0, job_key, ym)
 
-
-	rows = execute_dml(job_key, INSERT_APT_MASTER_NEW)
+	rows = execute_dml(job_key, INSERT_APT_MASTER_NEW, (ym,))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 	apt_cnt = rows
 
 	rows = execute_dml(job_key, UPDATE_TMP_RAW_DATA2)
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, SELECT_APT_ID_NULL)
-	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+	if rows != 0:
+		logger.error("CHCK!!! apt_id null exists : " + str(rows))
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_RAW_DATA)
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_NEW)
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 	ins_cnt = rows
 
 	rows = execute_dml(job_key, INSERT_APT_SALE_DELETED, (job_key, ym, ym))
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
 	rows = execute_dml(job_key, DELETE_APT_SALE_NEW, (ym, job_key)) 
 	if rows < 0:
-		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key)
+		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 	del_cnt = rows
 
 	if ins_cnt > 0 or del_cnt > 0:
@@ -690,6 +719,8 @@ for ym in YMs:
 	execute_dml(job_key, UPDATE_JOB_LOG_SUCCESS, (ym_end_dt.strftime('%Y%m%d%H%M%S'), get_cnt, ins_cnt, del_cnt, apt_cnt, job_key))
 
 	logger.info(ym + " : Completed(" + str(ym_end_dt - ym_start_dt) + ") : " + str(ins_cnt))
+	if os.path.isfile(CSV_FILE):
+		os.remove(CSV_FILE)
 
 logger.info("Completed!!")
 

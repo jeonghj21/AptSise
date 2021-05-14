@@ -1,0 +1,9 @@
+*.log
+*.ini
+*.bak.*
+*.pid
+*.csv
+config*.py
+tableexport.js
+wsgi.py
+__pycache__/
