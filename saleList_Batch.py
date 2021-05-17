@@ -456,7 +456,7 @@ INSERT_APT_SALE_STATS_DANJI_Y = """
 		select region_key, 3, made_year, area_type, a.ym, 'Y'
 			 , round(avg(price/(area/3.3)), 2) unit_price, round(avg(price), 2) price, count(*)
 	 	  from apt_sale_new a, apt_master b
-	 	 where a.apt_id = b.id and a.ym = %s and b.k_apt_id is not null
+	 	 where a.apt_id = b.id and a.ym = %s and ifnull(b.danji_flag, 'N') = 'Y'
 	 	 group by region_key, made_year, area_type, a.ym
 """
 
