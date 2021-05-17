@@ -94,7 +94,7 @@ def getAddConditions( params, required = {}, ignored = {} ):
 
 	add_conditions = ""
 	if len(ignored) == 0 or 'danji' not in ignored:
-		add_conditions += " and danji_flag = '" + (params['danji'] if 'danji' in params else 'N') + "'"
+		add_conditions += " and ifnull(danji_flag, 'N') = '" + (params['danji'] if 'danji' in params else 'N') + "'"
 	if 'from_ym' in params and (len(required) == 0 or 'from_ym' in required) and (len(ignored) == 0 or 'from_ym' not in ignored):
 		add_conditions += " and ym >= '" + params['from_ym'] + "'"
 	if 'to_ym' in params and (len(required) == 0 or 'to_ym' in required) and (len(ignored) == 0 or 'to_ym' not in ignored):
@@ -187,7 +187,7 @@ def getRegions():
 	return jsonify(json_return)
 
 SELECT_APT_MASTER = """
-	select id, apt_name, case when k_apt_id is null then 'N' else 'Y' end danji_flag
+	select id, apt_name, ifnull(danji_flag, 'N') danji_flag
 	 from apt_master
 	 where region_key = :region
 	 order by apt_name
