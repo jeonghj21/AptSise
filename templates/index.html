@@ -36,11 +36,12 @@ $(document).ready(function(){
 	initDrawOptionsMap();
 
 	var html = "";
-	for(var i=0; i<gPriceGubun.length; i++) {
-		html += "<option value=" + i + ">"+gPriceGubun[i].title+"</option>";
+	const priceGubunArr = PriceGubun.getAllPriceGubun();
+	for(var i=0; i<priceGubunArr.length; i++) {
+		html += "<option value=" + i + ">"+priceGubunArr[i].title+"</option>";
 	}
 	$('#price_gubun').html(html);
-	$('.price_text').text(gPriceGubun[0].title);
+	$('.price_text').text(priceGubunArr[0].title);
 
 	setErrorHandler();
 
