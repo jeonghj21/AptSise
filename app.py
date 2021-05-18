@@ -94,7 +94,7 @@ def getAddConditions( params, required = {}, ignored = {} ):
 
 	add_conditions = ""
 	if len(ignored) == 0 or 'danji' not in ignored:
-		add_conditions += " and ifnull(danji_flag, 'N') = '" + (params['danji'] if 'danji' in params else 'N') + "'"
+		add_conditions += " and ifnull(danji_flag, 'N') = " + ("'" + params['danji'] + "'" if 'danji' in params else "ifnull(danji_flag," + "'N')")
 	if 'from_ym' in params and (len(required) == 0 or 'from_ym' in required) and (len(ignored) == 0 or 'from_ym' not in ignored):
 		add_conditions += " and ym >= '" + params['from_ym'] + "'"
 	if 'to_ym' in params and (len(required) == 0 or 'to_ym' in required) and (len(ignored) == 0 or 'to_ym' not in ignored):
