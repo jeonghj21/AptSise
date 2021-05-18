@@ -331,7 +331,7 @@ INSERT_JOB_LOG = "insert into job_log values(%s, %s, %s, str_to_date(%s, '%Y%m%d
 
 INSERT_APT_MASTER_NEW = """
 	insert into apt_master 
-	select null, concat(법정동시군구코드, 법정동읍면동코드), 아파트, 도로명코드, 건축년도, null, null, %s
+	select null, concat(법정동시군구코드, 법정동읍면동코드), 아파트, 도로명코드, 건축년도, null, %s
         from tmp_raw_data2_new
        where (건축년도, concat(법정동시군구코드, 법정동읍면동코드), 도로명코드, 아파트)
         not in (select made_year, region_key, road_cd, apt_name from apt_master)

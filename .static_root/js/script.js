@@ -6,10 +6,94 @@ var loadingApt = false;
 var myChart = null;
 var gChartData = new Map();
 var gChartArea = '';
+/*
 const gOrderByOptions = [ ['rate', '상승율순 조회'], ['price', '기준가격순 조회'], ['name', '가나다순 조회']];
 const gPriceGubun = [ { title: '평단가', price: 'uprice', ma: 'uma', rate: 'urate', before_price: 'before_uprice' }, 
 					  { title: '매매가', price: 'price', ma: 'ma', rate: 'rate', before_price: 'before_price' } ];
+*/
 var BASE_URL;
+
+class OrderBy {
+	constructor(var_name, title) {
+		this._var_name = var_name;
+		this._title = title;
+	}
+
+	get var_name() {
+		return this._var_name;
+	}
+
+	get title() {
+		return this._title;
+	}
+}
+
+class PriceGubun {
+	constructor(title, price_name, ma_name, rate_name) {
+		this._title = title;
+		this._price_name = price_name;
+		this._ma_name = ma_name;
+		this._rate_name = rate_name;
+
+		this._order_by_arr = [ new OrderBy(rate_name, '상승율순 조회')
+							 , new OrderBy(price_name, '기준가격순 조회')
+							 , new OrderBy('name', '가나다순 조회') ];
+	}
+
+	get title() {
+		return this._title;
+	}
+
+	get price_name() {
+		return this._price_name;
+	}
+
+	get ma_name() {
+		return this._ma_name;
+	}
+
+	get rate_name() {
+		return this._rate_name;
+	}
+
+	get before_price_name() {
+		return "before_" + this._price_name;
+	}
+
+	static cPriceGubun = [ new PriceGubun('평단가', 'uprice', 'uma', 'urate'),
+						   new PriceGubun('매매가', 'price', 'ma', 'rate') ];
+
+	static getPriceGubun(params) {
+		let nPriceGubun = -1;
+
+		let target = '';
+		if (typeof params == "object")
+			target = params['price_gubun'];
+		else
+			target = '' + params;
+
+		try {
+			nPriceGubun = parseInt(target);
+		} catch (e) {
+			alert('Error : price_gubun = ' + target + ', error = ' + e.message);
+		}
+		if (nPriceGubun < 0 || nPriceGubun > PriceGubun.cPriceGubun.length - 1) {
+			alert('Invalid price_gubun : ' + target);
+			return null;
+		}
+		return PriceGubun.cPriceGubun[nPriceGubun];
+	}
+
+	static getAllPriceGubun() {
+		return PriceGubun.cPriceGubun;
+	}
+
+	getOrderByArr() {
+		return this._order_by_arr;
+	}
+
+}
+
 
 function constructSel(sel, arr, sortKey = null, filterFunc = null, removeAllFlag = false) {
 	if (removeAllFlag)
@@ -262,7 +346,10 @@ function getChartParams() {
 
 function changePriceGubun(gubun) {
 
-	$('.price_text').text(gPriceGubun[parseInt(gubun)].title);
+	// $('.price_text').text(gPriceGubun[parseInt(gubun)].title);
+	let priceGubun = PriceGubun.getPriceGubun(gubun);
+
+	$('.price_text').text(priceGubun.title);
 
 	if (gChartArea == '')
 		updateChart();
@@ -600,12 +687,14 @@ function hideChart(btn, index) {
 }
 
 function makeChart2TableHTML(chart) {
-	var priceGubun = gPriceGubun[parseInt(chart.params['price_gubun'])].title;
+	//var priceGubun = gPriceGubun[parseInt(chart.params['price_gubun'])].title;
+	const priceGubun = PriceGubun.getPriceGubun(chart.params);
+
 	var html = "<tr>";
 	html += "<th>년월</th>";
-	html += "<th>평균" + priceGubun + "</th>";
+	html += "<th>평균" + priceGubun.title + "</th>";
 	if (chart.data['ma']) {
-		html += "<th>평균" + priceGubun + "(1YR)</th>";
+		html += "<th>평균" + priceGubun.title + "(1YR)</th>";
 	}
 	if (chart.data['cnt']) {
 		html += "<th>거래건수</th>";
@@ -1220,10 +1309,11 @@ function makeBoxPlotDataset(labels, data, yAxesId, title, color, params) {
 
 function drawChart(title, labels, data, params, chartOptions){
 
-	var priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
-	const mainData = data[priceGubun.price];
+	//var priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
+	const priceGubun = PriceGubun.getPriceGubun(params);
+	const mainData = data[priceGubun.price_name];
 	const volumeData = data['cnt'];
-	const maData = data[priceGubun.ma];
+	const maData = data[priceGubun.ma_name];
 
 	// 상대수치로 그리기 라면
 	if (gDrawOptions['draw_relative']) {
@@ -1268,10 +1358,11 @@ function drawChart(title, labels, data, params, chartOptions){
 
 function drawNewChart(title, labels, data, params){
 
-	var priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
-	const mainData = data[priceGubun.price];
+	//var priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
+	const priceGubun = PriceGubun.getPriceGubun(params);
+	const mainData = data[priceGubun.price_name];
 	const volumeData = data['cnt'];
-	const maData = data[priceGubun.ma];
+	const maData = data[priceGubun.ma_name];
 	const yLabel = priceGubun.title;
 
 	gDrawOptions.disabled = false;
@@ -1456,8 +1547,10 @@ function drawRankLegend(chart) {
 	text.push("&nbsp;|&nbsp;");
 	var curOrderby = chartParams['orderby'];
 	text.push("<select id=rank_orderby class='chart-btn chart-btn-excel' onchange='redrawRankChart();'>");
-	gOrderByOptions.forEach(function(orderbyOption) {
-		text.push("<option value="+orderbyOption[0]+(curOrderby == orderbyOption[0] ? " selected":"") + ">"+orderbyOption[1]+"</option>");
+	const priceGubun = PriceGubun.getPriceGubun(chartParams);
+	const orderByOptions = priceGubun.getOrderByArr();
+	orderByOptions.forEach(function(orderbyOption) {
+		text.push("<option value="+orderbyOption.var_name+(curOrderby == orderbyOption.var_name ? " selected":"") + ">"+orderbyOption.title+"</option>");
 	});
 	text.push("</select>");
 	text.push("<button class='chart-btn chart-btn-excel' onclick='excelRankChart();'>엑셀 다운로드</button>");
@@ -1473,7 +1566,9 @@ function redrawRankChart() {
 	chartData = gChartData.get(myChart.data.datasets[0].label);
 
 	var selectedIndex = $('#rank_orderby option').index($('#rank_orderby option:selected'));
-	chartData.params['orderby'] = gOrderByOptions[selectedIndex][0];
+	const priceGubun = PriceGubun.getPriceGubun(chartData.params);
+	const orderByOptions = priceGubun.getOrderByArr();
+	chartData.params['orderby'] = orderByOptions[selectedIndex].var_name;
 
 	chartData.params['page'] = 1;
 
@@ -1537,14 +1632,15 @@ function getRegionTitle(params) {
 
 function makeTitle4RankChart(gubun, params) {
 	let title = getRegionTitle(params);
-	let priceGubun = gPriceGubun[parseInt(params['price_gubun'])].title;
+	//let priceGubun = gPriceGubun[parseInt(params['price_gubun'])].title;
+	const priceGubun = PriceGubun.getPriceGubun(params);
 
 	switch(gubun) {
 		case 'Region':
-			title += '지역별 ' + priceGubun + ' 변동율';
+			title += '지역별 ' + priceGubun.title + ' 변동율';
 			break;
 		case 'Apt':
-			title += '아파트별 ' + priceGubun + ' 변동율';
+			title += '아파트별 ' + priceGubun.title + ' 변동율';
 			break;
 	}
 
@@ -1606,8 +1702,10 @@ function initParamAndOption4RankChart(params) {
 	gDrawOptions.checked = false;
 	gDrawOptions.disabled = true;
 
+	const priceGubun = PriceGubun.getPriceGubun(params);
+	const orderByOptions = priceGubun.getOrderByArr();
 	// if not exists, add & set default value for params - orderby & page
-	getConditionParam(params, 'orderby', gOrderByOptions[0][0]);
+	getConditionParam(params, 'orderby', orderByOptions[0].var_name);
 	let page = getConditionParam(params, 'page', 1);
 }
 
@@ -1636,11 +1734,12 @@ function drawRankChart(gubun, params) {
 
 		gChartData.set(title, { 'data': data, 'params': params });
 
-		const priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
-		let price_name = priceGubun.price;
-		let rate_name = priceGubun.rate;
+		//const priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
+		const priceGubun = PriceGubun.getPriceGubun(params);
+		let price_name = priceGubun.price_name;
+		let rate_name = priceGubun.rate_name;
 		let yLabel = priceGubun.title;
-		let bprice_name = priceGubun.before_price;
+		let bprice_name = priceGubun.before_price_name;
 
 		setXAxeForDualBar();
 		addRightYAxe(yLabel);

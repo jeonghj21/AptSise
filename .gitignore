@@ -3,6 +3,7 @@
 *.bak.*
 *.pid
 *.csv
+batch.sql
 config*.py
 tableexport.js
 wsgi.py
