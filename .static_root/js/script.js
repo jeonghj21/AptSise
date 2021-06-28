@@ -132,7 +132,7 @@ function clearChildSelect(sel) {
 	constructSel(sel, {});
 	if (sel.attr('id') == 'apt') {
 		$('#apt').val('').change();
-		$('#danji').attr('disabled', true);
+//		$('#danji').attr('disabled', true);
 	}
 
 	let child = sel.attr("child");
@@ -185,7 +185,7 @@ function refreshApt(apt) {
 
 	var aptArr = gRegionsMap[region_key3]['subregions'];
 
-	$('#danji').attr('disabled', false);
+//	$('#danji').attr('disabled', false);
 	var func = ($("#danji").is(":checked") 
 		? function(index, data) { 
 			return data['danji'] == 'Y'; // data is array of id, array of name, danji_flag
