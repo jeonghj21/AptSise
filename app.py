@@ -136,7 +136,7 @@ SELECT_APT_SALE_MA_GROUP_BY = " group by apt_id, ym"
 
 SELECT_APT_SALE = """
 	 	 select apt_id, ym, round(avg(price/(area/3.3)), 2) uprice, round(avg(price), 2) price, count(*) cnt 
-		   from apt_sale_new 
+		   from apt_sale_items 
 		  where apt_id = :apt 
 """
 
@@ -253,7 +253,7 @@ def getSaleStat():
 def getAptSale():
 	params = request.args.to_dict()
 	apt = params['apt']
-	sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale_new"
+	sql = "select date_format(saled, '%Y-%m-%d') dt, area, floor, format(price,0) price from apt_sale_items"
 	sql += " where apt_id = " + apt 
 	sql += getAddConditions(params, { 'base_ym', 'area_type' }, { 'danji' })
 	sql += " order by saled"
@@ -484,7 +484,7 @@ def getRankByApt():
 SELECT_QBOX = """
 	select 1 max_min, price_gubun, a.ym, max_price, min_price, 1q_price, 3q_price, median_price, avg_price
 		 , DATE_FORMAT(saled, '%Y/%m/%d') saled, price, area, floor, apt_id, apt_name, made_year
-   	  from apt_qbox_stats a, apt_sale_new s, apt_master m
+   	  from apt_qbox_stats a, apt_sale_items s, apt_master m
   	 where a.region_key = :region
  	   and a.level = :level
 	   and a.danji_flag = :danji
@@ -494,7 +494,7 @@ SELECT_QBOX = """
 	union
 	select 2 max_min, price_gubun, a.ym, max_price, min_price, 1q_price, 3q_price, median_price, avg_price
 		 , DATE_FORMAT(saled, '%Y/%m/%d') saled, price, area, floor, apt_id, apt_name, made_year
-   	  from apt_qbox_stats a, apt_sale_new s, apt_master m
+   	  from apt_qbox_stats a, apt_sale_items s, apt_master m
   	 where a.region_key = :region
  	   and a.level = :level
 	   and a.danji_flag = :danji
