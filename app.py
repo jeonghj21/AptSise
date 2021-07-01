@@ -11,10 +11,10 @@ app.engine = create_engine(app.config['DB_URL'], encoding = 'utf-8')
 
 INSERT_ACCESS_LOG = text("insert into access_log values(:ip, str_to_date(:dt, '%Y%m%d%H%i%S'))")
 SELECT_LAST_JOB = """
-select job_param ym, DATE_FORMAT(start_dt, '%Y/%m/%d %H:%i:%s') start_dt, ifnull(DATE_FORMAT(end_dt, '%Y/%m/%d %H:%i:%s'), '') end_dt
+select job_key, ifnull(DATE_FORMAT(end_dt, '%Y/%m/%d %H:%i:%s'), '') end_dt
 	 , case when result='Y' then '완료' when result = 'N' then '오류' else '진행중' end status
   from job_log
- order by job_key desc
+ order by start_dt desc
  limit 1
 """
 
@@ -32,8 +32,7 @@ def index():
 			conn.execute(INSERT_ACCESS_LOG, ip=request.remote_addr, dt=now.strftime('%Y%m%d%H%M%S'))
 			res = conn.execute(text(SELECT_LAST_JOB))
 			for r in res:
-				result['ym'] = r['ym']
-				result['start_dt'] = r['start_dt']
+				result['job_key'] = r['job_key']
 				result['end_dt'] = r['end_dt']
 				result['status'] = r['status']
 			res = conn.execute(text(SELECT_LAST_BATCH))

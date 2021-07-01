@@ -91,7 +91,7 @@
 	<div class="my-box">
 		<label>최근 작업</label>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleView(this, 'job_log');" >▼ 보이기</a><br>
 		<div id=job_log style="display:none;">
-		<span style="font-size:small">{{result['ym']}}&nbsp;&nbsp;|&nbsp;&nbsp;{{result['start_dt']}} ~ {{result['end_dt']}}&nbsp;&nbsp;|&nbsp;&nbsp;{{result['status']}}<br>
+		<span style="font-size:small">{{result['job_key']}}|{{result['end_dt']}}|{{result['status']}}<br>
 		{{result['batch']}}
 		</span>
 		</div>
