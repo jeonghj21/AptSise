@@ -66,6 +66,7 @@ UPDATE_TMP_RAW_REGION_LEVEL4 = """
 		select 법정동시군구코드, 법정동읍면동코드 
 		  from tmp_raw_data_error
 		 where level = 4
+		   and job_key = %s
 		)
 """
 
@@ -84,6 +85,7 @@ UPDATE_TMP_RAW_REGION_LEVEL5 = """
 		select 법정동시군구코드, 법정동읍면동코드 
 		  from tmp_raw_data_error 
 		 where level = 5
+		   and job_key = %s
 		)
 """
 
@@ -215,7 +217,7 @@ INSERT_APT_SALE_ITEMS = """
 		select null, cast(replace(거래금액, ',', '') as signed integer),
 	 		   STR_TO_DATE(concat(cast(년 as char), lpad(cast(월 as char), 2, '0'), lpad(cast(일 as char),2,'0')), '%Y%m%d'),
 	 		   전용면적, case when 전용면적<=60 then '01' when 전용면적>60 and 전용면적<=85 then '02' when 전용면적>85 and 전용면적<=135 then '03' when 전용면적>135 then '04' end,
-	 		   cast(case when 층='' then '0' else 층 end as signed integer), 일련번호, apt_id, concat(cast(년 as char), lpad(cast(월 as char), 2, '0')) 
+	 		   cast(case when 층='' then '0' else 층 end as signed integer), 일련번호, apt_id, concat(cast(년 as char), lpad(cast(월 as char), 2, '0')), %s 
 	 	  from tmp_raw_data2_new
 """
 
@@ -294,10 +296,10 @@ for ym in YMs:
 			job_fail(get_cnt, 0, 0, 0, job_key, ym)
 		rows = my_utils.execute_dml(job_key, INSERT_RAW_DATA_ERROR)
 		if rows > 0:
-			update4 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL4)
-			update5 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL5)
-			if rows > update4 + update5:
-				logger.error("CHCK!!! tmp_raw_data_error Not All Updated : invalid = " + str(rows) + ", updated = " + str(update4 + update5))
+			update4 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL4, (job_key,))
+			update5 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL5, (job_key,))
+			if rows !=update4 + update5:
+				logger.error("CHCK!!! tmp_raw_data_error Not All Updated : invalid = " + str(rows) + ", updated4 = " + str(update4) + ", updated5 = " + str(update5))
 				job_fail(get_cnt, 0, 0, 0, job_key, ym)
 
 	if my_utils.execute_dml(job_key, UPDATE_TMP_RAW_MADE_YEAR1) < 0:
@@ -309,7 +311,7 @@ for ym in YMs:
 	if my_utils.execute_dml(job_key, INSERT_TMP_RAW_DATA2, (ym,)) < 0:
 		job_fail(get_cnt, 0, 0, 0, job_key, ym)
 
-	rows = my_utils.execute_dml(job_key, INSERT_APT_MASTER_NEW, (ym,))
+	rows = my_utils.execute_dml(job_key, INSERT_APT_MASTER_NEW, (job_key,))
 	if rows < 0:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 	apt_cnt = rows
@@ -327,7 +329,7 @@ for ym in YMs:
 	if rows < 0:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 
-	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_ITEMS)
+	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_ITEMS, (job_key,))
 	if rows < 0:
 		job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
 	ins_cnt = rows
