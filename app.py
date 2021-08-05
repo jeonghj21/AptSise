@@ -392,11 +392,12 @@ def getRankCommon(request, sqlarr, requiredParams):
 	return json_return
 
 SELECT_CHANGE_RATE_REGION = ["""
-	select a.*, a.region_key, '' apt
-	  from (
-		select r.region_name name, convert(a.uprice, char) uprice, convert(b.before_uprice, char) before_uprice
-				, convert(a.price, char) price, convert(b.before_price, char) before_price, a.region_key
-				  , convert(round((uprice / before_uprice)*100, 2), char) urate, convert(round((price / before_price)*100, 2), char) rate
+	select a.*, '' apt
+	from(
+		select r.region_name name, a.uprice, b.before_uprice
+			, a.price, b.before_price, a.region_key
+		  	, round((uprice / before_uprice)*100, 2) urate
+		  	, round((price / before_price)*100, 2) rate
 		 from (
 		 	 select a.region_key
 			 	  , round(sum(a.unit_price * a.cnt) / sum(a.cnt), 2) uprice
@@ -500,63 +501,6 @@ def getRankByApt():
 
 	json_return = getRankCommon(request, SELECT_CHANGE_RATE_APT, { 'danji', 'ages', 'age_sign', 'area_type' })
 
-	return jsonify(json_return)
-
-
-SELECT_QBOX = """
-	select 1 max_min, price_gubun, a.ym, max_price, min_price, 1q_price, 3q_price, median_price, avg_price
-		 , DATE_FORMAT(saled, '%Y/%m/%d') saled, price, area, floor, apt_id, apt_name, made_year
-   	  from apt_qbox_stats a, apt_sale_items s, apt_master m
-  	 where a.region_key = :region
- 	   and a.level = :level
-	   and a.danji_flag = :danji
- 	   and a.ym between :from_ym and :to_ym
-	   and s.id = a.max_sale_id
-	   and s.apt_id = m.id
-	union
-	select 2 max_min, price_gubun, a.ym, max_price, min_price, 1q_price, 3q_price, median_price, avg_price
-		 , DATE_FORMAT(saled, '%Y/%m/%d') saled, price, area, floor, apt_id, apt_name, made_year
-   	  from apt_qbox_stats a, apt_sale_items s, apt_master m
-  	 where a.region_key = :region
- 	   and a.level = :level
-	   and a.danji_flag = :danji
- 	   and a.ym between :from_ym and :to_ym
-	   and s.id = a.min_sale_id
-	   and s.apt_id = m.id
-  order by price_gubun, ym, max_min
-"""
-
-@app.route("/getBoxPlot")
-def getBoxPlot():
-	params = request.args.to_dict()
-	danji = params['danji']
-	if danji == "":
-		danji = 'N'
-
-	print(SELECT_QBOX)
-	with app.engine.connect() as connection:
-		result = connection.execute(text(SELECT_QBOX), upper=params['upper'], region=params['region_key'], level=params['level'], \
-													   danji=danji, from_ym=params['from_ym'], to_ym=params['to_ym'])
-	rows=result.fetchall()            
-
-	data = { 'labels': [], 'data': [] }
-	before_gubun = ''
-	data_idx = 0
-	data['data'].append([])
-	for r in rows:
-		if before_gubun != '' and before_gubun != r['price_gubun']:
-			data_idx = data_idx + 1
-			data['data'].append([])
-		if data_idx == 0 and (len(data['labels']) == 0 or data['labels'][len(data['labels'])-1] != r['ym']):
-			data['labels'].append(r['ym'])
-		data['data'][data_idx].append({ 'price_gubun': r['price_gubun'], 'ym': r['ym'], 'max_price': r['max_price'], 'min_price': r['min_price'], \
-								'1q_price': r['1q_price'], '3q_price': r['3q_price'], 'median_price': r['median_price'], 'avg_price': r['avg_price'], \
-		         				'saled': r['saled'], 'price': r['price'], 'area': r['area'], 'floor': r['floor'], 'apt_id': r['apt_id'], \
-								'apt_name': r['apt_name'], 'made_year': r['made_year'] })
-		before_gubun = r['price_gubun']
-
-	json_return=json.dumps(data)   #string #json
- 
 	return jsonify(json_return)
 
 
