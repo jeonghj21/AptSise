@@ -688,57 +688,19 @@ function hideChart(btn, index) {
 
 }
 
-function makeChart2TableHTML(chart) {
-	//var priceGubun = gPriceGubun[parseInt(chart.params['price_gubun'])].title;
-	const priceGubun = PriceGubun.getPriceGubun(chart.params);
-
-	var html = "<tr>";
-	html += "<th>년월</th>";
-	html += "<th>평균" + priceGubun.title + "</th>";
-	if (chart.data['ma']) {
-		html += "<th>평균" + priceGubun.title + "(1YR)</th>";
-	}
-	if (chart.data['cnt']) {
-		html += "<th>거래건수</th>";
-	}
-	html += "</tr>";
-	var labels = Object.values(chart.labels);
-	var data = Object.values(chart.data['data']);
-	var volume_data = null;
-	var ma_data = null;
-	if (chart.data['cnt']) {
-		volume_data = Object.values(chart.data['cnt']);
-	}
-	if (chart.data['ma']) {
-		ma_data = Object.values(chart.data['ma']);
-	}
-	for(var i = 0; i < data.length; i++) {
-		html += "<tr>";
-		html += "<td>"+labels[i]+"</td>";
-		html += "<td>"+(data[i]==null?"":data[i])+"</td>";
-		if (chart.data['ma']) {
-			html += "<td>"+(ma_data[i]==null?"":ma_data[i])+"</td>";
-		}
-		if (chart.data['cnt']) {
-			html += "<td>"+(volume_data[i]==null?"":volume_data[i])+"</td>";
-		}
-		html += "</tr>";
-	}
-	return html;
-}
-
 function makeRankChart2TableHTML(data) {
+
 	var html = "<tr><th>구분</th>";
-	html += "<th>상승율</th>";
+	html += "<th>"+myChart.data.datasets[0].label+"</th>";
 	html += "<th>"+myChart.data.datasets[1].label+"</th>";
 	html += "<th>"+myChart.data.datasets[2].label+"</th>";
 	html += "</tr>";
 	for(var i = 0; i < data['labels'].length; i++) {
 		html += "<tr>";
 		html += "<td>"+data['labels'][i]+"</td>";
-		html += "<td>"+data['data'][i]+"</td>";
-		html += "<td>"+data['price'][i]+"</td>";
-		html += "<td>"+data['before_price'][i]+"</td>";
+		html += "<td>"+myChart.data.datasets[0].data[i]+"</td>";
+		html += "<td>"+myChart.data.datasets[1].data[i]+"</td>";
+		html += "<td>"+myChart.data.datasets[2].data[i]+"</td>";
 		html += "</tr>";
 	}
 	return html;
@@ -757,7 +719,41 @@ function excelChart(index) {
 	var title = myChart.data.datasets[index].label;
 
 	var chart = gChartData.get(title);
-	table2excel(title, makeChart2TableHTML(chart) );
+	const priceGubun = PriceGubun.getPriceGubun(chart.params);
+
+	var html = "<tr>";
+	html += "<th>년월</th>";
+	html += "<th>평균 " + priceGubun.title + "</th>";
+	if (chart.data['ma']) {
+		html += "<th>평균 " + priceGubun.title + "(1YR)</th>";
+	}
+	if (chart.data['cnt']) {
+		html += "<th>거래건수</th>";
+	}
+	html += "</tr>";
+	var labels = Object.values(myChart.data.labels);
+	var data = Object.values(myChart.data.datasets[index].data);
+	var volume_data = null;
+	var ma_data = null;
+	if (chart.data['cnt']) {
+		volume_data = Object.values(chart.data['cnt']);
+	}
+	if (chart.data['ma']) {
+		ma_data = Object.values(chart.data[priceGubun.ma_name]);
+	}
+	for(var i = 0; i < data.length; i++) {
+		html += "<tr>";
+		html += "<td>"+labels[i]+"</td>";
+		html += "<td>"+(data[i]==null?"":data[i])+"</td>";
+		if (chart.data['ma']) {
+			html += "<td>"+(ma_data[i]==null?"":ma_data[i])+"</td>";
+		}
+		if (chart.data['cnt']) {
+			html += "<td>"+(volume_data[i]==null?"":volume_data[i])+"</td>";
+		}
+		html += "</tr>";
+	}
+	table2excel(title, html);
 }
 
 function excelRankChart() {
@@ -1270,45 +1266,6 @@ function setDataRelative(mainData, maData) {
 		makeRelativeData(base_pos, maData);
 }
 
-function makeBoxPlotDataset(labels, data, yAxesId, title, color, params) {
-
-	let chartOptions = {};
-
-	chartOptions['pointRadius'] = 5;
-	let bgColor = chartOptions['backgroundColor'];
-	chartOptions['backgroundColor'] = 'rgba(0, 0, 0, 0)';
-	let brColor = chartOptions['borderColor'];
-	chartOptions['borderColor'] = 'rgba(0, 0, 0, 0)';
-	chartOptions['spinGaps'] = false;
-
-	chartOptions['pointBackgroundColor'] = color;
-	chartOptions['raw_data'] = [];
-	
-	let scatterData = [];
-	for( var i = 0; i < labels.length; i++) {
-		var label = labels[i];
-		// 2 data - max & min for one ym
-		if (label == data[i*2]['ym']) {
-			let d = label.substring(0, 4) + "-" + label.substring(4, 6) + "-01T00:00:00";
-			let ts = Date.parse(d);
-			scatterData.push( { 'x': ts, 'y': data[i]['max_price'] } );
-			scatterData.push( { 'x': ts, 'y': data[i]['1q_price'] } );
-			scatterData.push( { 'x': ts, 'y': data[i]['median_price'] } );
-			scatterData.push( { 'x': ts, 'y': data[i]['3q_price'] } );
-			scatterData.push( { 'x': ts, 'y': data[i]['min_price'] } );
-			chartOptions['raw_data'][i] = [ data[i], data[i+1] ];
-		}
-	}
-	
-	makeChartDataset('scatter', title, yAxesId, scatterData, 'blue', chartOptions);
-
-	delete chartOptions['pointRadius'];
-	chartOptions['backgroundColor'] = bgColor ;
-	delete chartOptions['pointBackgroundColor'];
-	chartOptions['borderColor'] = brColor ;
-	chartOptions['spinGaps'] = true;
-}
-
 function drawChart(title, labels, data, params, chartOptions){
 
 	//var priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
@@ -1641,7 +1598,6 @@ function getRegionTitle(params) {
 
 function makeTitle4RankChart(gubun, params) {
 	let title = getRegionTitle(params);
-	//let priceGubun = gPriceGubun[parseInt(params['price_gubun'])].title;
 	const priceGubun = PriceGubun.getPriceGubun(params);
 
 	switch(gubun) {
@@ -1654,15 +1610,6 @@ function makeTitle4RankChart(gubun, params) {
 	}
 
 	var ignoreParams = {'from_ym':true, 'to_ym':true, 'orderby':true, 'page':true};
-	title = makeChartConditionTitle(title, params, ignoreParams );
-
-	return title;
-}
-
-function makeTitle4BoxPlotChart(params) {
-	let title = getRegionTitle(params);
-
-	var ignoreParams = {};
 	title = makeChartConditionTitle(title, params, ignoreParams );
 
 	return title;
