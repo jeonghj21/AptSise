@@ -14,13 +14,25 @@ SELECT_LAST_JOB = """
 select job_key, ifnull(DATE_FORMAT(end_dt, '%Y/%m/%d %H:%i:%s'), '') end_dt
 	 , case when result='Y' then '완료' when result = 'N' then '오류' else '진행중' end status
   from job_log
+  where 
  order by start_dt desc
  limit 1
+"""
+SELECT_LAST_JOB = """
+	select a.job_param, ifnull(b.job_key, a.job_key) job_key, ifnull(b.end_dt, ifnull(a.end_dt, a.start_dt)) dt
+		 , ifnull(b.result, a.result) result, a.get_cnt, a.insert_cnt, a.new_apt_cnt
+	  from (
+	  	select * from job_log 
+		 where start_dt > date_sub(curdate(), interval 5 day) and job_key like 'ITEMS%' 
+		 order by start_dt desc limit 1
+	  ) a 
+	  left outer join job_log b 
+	  on b.start_dt > a.start_dt and b.job_key like 'STAT%' and b.job_param = a.job_param
 """
 
 SELECT_LAST_BATCH = """
 	select concat(DATE_FORMAT(start_dt, '%Y/%m/%d %H:%i:%s'), ' : ', name, ifnull(comment, '')) batch 
-	  from batch_log order by id desc limit 1
+	  from batch_log where start_dt > date_sub(curdate(), interval 5 day) order by id desc limit 1
 """
 
 @app.route("/")
@@ -32,9 +44,12 @@ def index():
 			conn.execute(INSERT_ACCESS_LOG, ip=request.remote_addr, dt=now.strftime('%Y%m%d%H%M%S'))
 			res = conn.execute(text(SELECT_LAST_JOB))
 			for r in res:
+				print(r)
+				result['job_param'] = r['job_param']
 				result['job_key'] = r['job_key']
-				result['end_dt'] = r['end_dt']
-				result['status'] = r['status']
+				result['dt'] = r['dt']
+				result['status'] = r['result']
+
 			res = conn.execute(text(SELECT_LAST_BATCH))
 			for r in res:
 				result['batch'] = r['batch']
@@ -42,7 +57,7 @@ def index():
 	except Exception as e:
 		print(str(e))
 
-	return render_template('index.html', result=result, dt=now.timestamp())
+	return render_template('index.html', result=result, dt=now.timestamp(), version=app.config['VERSION'])
 
 def spreadDataForYM(rows, ym_label, labels, data_list):
 	if len(rows) == 0:
@@ -342,10 +357,18 @@ def getRankCommon(request, sqlarr, requiredParams):
 		sql = sql + " order by " + orderby
 	else:
 		sql = sql + " order by " + orderby + " limit " + str(PAGE_SIZE+1) + " offset " + str((page-1)*PAGE_SIZE)
-	print(sql + ", base_ym="+base_ym+", mm="+str(int(years)*12))
-	with app.engine.connect() as connection:
-		result = connection.execute(text(sql), base_ym=base_ym, mm = int(years)*12, region=region)
+	
+	stmt = text(sql)
+	stmt = stmt.bindparams(
+			base_ym = base_ym, 
+			mm = int(years)*12, 
+			region = region
+	)
 
+	with app.engine.connect() as connection:
+		result = connection.execute(stmt)
+
+	print(sql + ", base_ym="+base_ym+", mm="+str(int(years)*12) + ", region="+region + ", rowcount="+str(result.rowcount))
 	json_data = { 'labels': [], 'rate':[], 'price':[], 'before_price':[], 'urate':[], 'uprice':[], 'before_uprice':[], 'has_more':False, 'region_key': [], 'apt': [] }
 	i = 0
 	for r in result:
