@@ -28,9 +28,12 @@
 			</tr>
 			<tr>
 				<td>
-					<select name="apt" id="apt" style="width:100%;" onchange="$('#apt_btn').attr('disabled', $('select#apt option:selected').val() == '');">
-						<option value=''>전체</option>
-					</select>
+					<div class="customSelectBox">
+  						<button class="aptLabel" id="aptLabel" name="전체">전체</button>
+ 						<ul class="aptList" id=apt>
+						<li value='' name='전체'>전체</li>
+  						</ul>
+					</div>
 				</td>
 			</tr>
 			<tr>
@@ -91,7 +94,7 @@
 	<div class="my-box">
 		<label>최근 작업</label>&nbsp;&nbsp;<a id=toggle_btn onclick="toggleView(this, 'job_log');" >▼ 보이기</a><br>
 		<div id=job_log style="display:none;">
-		<span style="font-size:small">{{result['job_param']}} | {{result['job_key']}} | {{result['dt']}} | {{result['status']}}<br>
+		<span style="font-size:small">{{result['job_param']}} | {{result['dt']}} | {{result['status']}}<br>
 		{{result['batch']}}
 		</span>
 		</div>

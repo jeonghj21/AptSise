@@ -99,12 +99,8 @@ class PriceGubun {
 
 }
 
-
-function constructSel(sel, arr, sortKey = null, filterFunc = null, removeAllFlag = false) {
-	if (removeAllFlag)
-		sel.empty();
-	else
-		sel.children().not(':first').remove();
+function constructSel(sel, arr, sortKey = null, filterFunc = null, contentsFunc = null) {
+	sel.children().not(':first').remove();
 
 	if (filterFunc) {
 		arr = arr.slice();
@@ -119,12 +115,17 @@ function constructSel(sel, arr, sortKey = null, filterFunc = null, removeAllFlag
 
 	$.each(arr, function(idx, r) {
 		if (r) { // not filtered out element
-			option = document.createElement("option");
-			option.value = r['key'];
-			option.innerText = r['name'];
-			sel.append(option);
+			if (contentsFunc != null)
+				sel[0].innerHTML += contentsFunc(r);
+			else {
+				option = document.createElement("option");
+				option.value = r['key'];
+				option.innerHTML = r['name'];
+				sel.append(option);
+			}
 		}
 	});
+
 }
 
 function initRegions() {
@@ -136,7 +137,10 @@ function clearChildSelect(sel) {
 	
 	constructSel(sel, {});
 	if (sel.attr('id') == 'apt') {
-		$('#apt').val('').change();
+		aptList = document.querySelector('#apt');
+		aptList.value = '';
+		aptLabel = document.querySelector('#aptLabel');
+		aptLabel.textContent = '전체';
 //		$('#danji').attr('disabled', true);
 	}
 
@@ -196,8 +200,16 @@ function refreshApt(apt) {
 			return data['danji'] == 'Y'; // data is array of id, array of name, danji_flag
 		  } 
 		: null); 
+	var naverLinkFunc = 
+		function(data) { 
+			var html = "";
+			if (data['naver'] && data['naver'].length > 0) {
+				html = "<li value="+data['key']+"><a href=javascript:window.open('https://new.land.naver.com/complexes/"+data['naver'][0][0]+"');>"+data['name']+"</a></li>";
+			}
+			return html;
+		} 
 	if (aptArr && aptArr.length > 0) { // already cached
-		constructSel($('#apt'), aptArr, -1 /* no sort */, func);
+		constructSel($('#apt'), aptArr, -1 /* no sort */, func, naverLinkFunc);
 		return;
 	}
 
@@ -206,7 +218,24 @@ function refreshApt(apt) {
 	$.getJSON(url, function(data){
 		aptArr = JSON.parse(data);
 		gRegionsMap[region_key3]['subregions'] = aptArr;
-		constructSel($('#apt'), aptArr, -1 /* no sort */, func);
+		constructSel($('#apt'), aptArr, -1 /* no sort */, func, naverLinkFunc);
+		const label = document.querySelector('#aptLabel');
+		const options = document.querySelectorAll('.aptList > li');
+
+		// 클릭한 옵션의 텍스트를 라벨 안에 넣음
+		const handleSelect = (item) => {
+  			label.parentNode.classList.remove('active');
+  			label.innerHTML = item.textContent;
+			item.parentNode.value = item.value;
+			item.parentNode.name = item.textContent;
+			$('#apt_btn').attr('disabled', item.value == '');
+		}
+
+		// 옵션 클릭시 클릭한 옵션을 넘김
+		options.forEach(option => {
+			option.addEventListener('click', () => handleSelect(option))
+		})
+
 	}).always(function() {
 		loadingApt = false;
 	});
@@ -301,7 +330,7 @@ function setValueOfParam(params, key, newValue) {
 function initChartParams() {
 	let params = {};
 
-	$('#chart_conditions input, #chart_conditions select').each(function(index, item) {
+	$('#chart_conditions input, #chart_conditions select, #chart_conditions ul').each(function(index, item) {
 		input = $(item);
 		key = input.attr('id');
 		if (params[key]) {
@@ -382,7 +411,8 @@ function requestSaleStat() {
 
 function requestSaleLine() {
 
-	var title = $('select#apt option:selected').text();
+	var aptList = $('#apt');
+	var title = aptList[0].name;
 	var params = getChartParams();
 
 	drawSaleLineChart(params, title);
@@ -1710,5 +1740,23 @@ function drawRankChart(gubun, params) {
 		closeMessage();
 
 	});
+}
+
+function initCustomSelect() {
+
+	const label = document.querySelector('#aptLabel');
+
+	// 라벨을 클릭시 옵션 목록이 열림/닫힘
+	label.addEventListener('click', () => {
+  		if(label.parentNode.classList.contains('active')) {
+  			label.parentNode.classList.remove('active');
+	  	} else {
+  			label.parentNode.classList.add('active');
+  		}
+	});
+	label.addEventListener('blur', () => {
+  		label.parentNode.classList.remove('active');
+	});
+
 }
 

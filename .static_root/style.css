@@ -70,4 +70,62 @@ div.white_content {
 	z-index:1002; 
 	overflow: auto; 
 }
+.customSelectBox {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  border-radius: 4px;
+  background: url('https://freepikpsd.com/media/2019/10/down-arrow-icon-png-7-Transparent-Images.png') calc(100% - 7px) center no-repeat;
+  border: 2px solid lightcoral;
+  background-size: 20px;
+  cursor: pointer;
+}
+.customSelectBox .aptLabel {
+  display: flex;
+  align-items: center;
+  width: inherit;
+  height: inherit;
+  border: 0 none;
+  outline: 0 none;
+  padding-left: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+.customSelectBox .aptList {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 100%;
+  background: white;
+  list-style-type: none;
+  padding: 0;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: 0;
+  transition: .3s ease-in;
+}
+
+.customSelectBox.active .aptList {
+  max-height: 400px;
+}
+
+.customSelectBox li {
+  border-bottom: 1px dashed rgb(170, 72, 72);
+  padding: 5px 15px 5px;
+  transition: .1s;
+}
+
+.customSelectBox li:hover {
+  background: rgb(175, 93, 93);
+}
+
+.customSelectBox li:last-child {
+  border-bottom: 0 none;
+}
+
+// 스크롤 커스텀
+//.customSelectBox .aptList::-webkit-scrollbar {width: 6px;}
+//.customSelectBox .aptList::-webkit-scrollbar-track {background: transparent; }
+//.customSelectBox .aptList::-webkit-scrollbar-thumb {background: #303030; border-radius: 45px;}
+//.customSelectBox .aptList::-webkit-scrollbar-thumb:hover {background: #303030;}
 </style>
