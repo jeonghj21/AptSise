@@ -6,8 +6,8 @@
 batch.sql
 config*.py
 tableexport.js
-wsgi.py
+uwsgi.py
 __pycache__/
 dump*.sql
 data/*.sql
-
+*.log.*

@@ -11,23 +11,11 @@ app.engine = create_engine(app.config['DB_URL'], encoding = 'utf-8')
 
 INSERT_ACCESS_LOG = text("insert into access_log values(:ip, str_to_date(:dt, '%Y%m%d%H%i%S'))")
 SELECT_LAST_JOB = """
-select job_key, ifnull(DATE_FORMAT(end_dt, '%Y/%m/%d %H:%i:%s'), '') end_dt
+select job_key, job_param, DATE_FORMAT(ifnull(end_dt, start_dt), '%Y/%m/%d %H:%i:%s') dt
 	 , case when result='Y' then '완료' when result = 'N' then '오류' else '진행중' end status
   from job_log
-  where 
  order by start_dt desc
  limit 1
-"""
-SELECT_LAST_JOB = """
-	select a.job_param, ifnull(b.job_key, a.job_key) job_key, ifnull(b.end_dt, ifnull(a.end_dt, a.start_dt)) dt
-		 , ifnull(b.result, a.result) result, a.get_cnt, a.insert_cnt, a.new_apt_cnt
-	  from (
-	  	select * from job_log 
-		 where start_dt > date_sub(curdate(), interval 5 day) and job_key like 'ITEMS%' 
-		 order by start_dt desc limit 1
-	  ) a 
-	  left outer join job_log b 
-	  on b.start_dt > a.start_dt and b.job_key like 'STAT%' and b.job_param = a.job_param
 """
 
 SELECT_LAST_BATCH = """
@@ -48,7 +36,7 @@ def index():
 				result['job_param'] = r['job_param']
 				result['job_key'] = r['job_key']
 				result['dt'] = r['dt']
-				result['status'] = r['result']
+				result['status'] = r['status']
 
 			res = conn.execute(text(SELECT_LAST_BATCH))
 			for r in res:
@@ -201,10 +189,11 @@ def getRegions():
 	return jsonify(json_return)
 
 SELECT_APT_MASTER = """
-	select id, apt_name, ifnull(danji_flag, 'N') danji_flag
-	 from apt_master
-	 where region_key = :region
-	 order by apt_name
+	select a.id, apt_name, ifnull(danji_flag, 'N') danji_flag, n.id naver_id, n.name naver_name 
+		from apt_master a 
+		left join naver_complex_info n 
+			on ifnull(a.naver_id, 0) = n.id    
+		where a.region_key = :region
 """
 
 @app.route("/getApt")
@@ -217,9 +206,22 @@ def getApt():
 		result = connection.execute(text(SELECT_APT_MASTER), region=region_key)
 
 	data = []
+	data_naver = []
+	before_r = None
 	for r in result:
-		data.append({ 'key': r['id'], 'name': r['apt_name'], 'danji': r['danji_flag'] })
+		if before_r != None:
+			if before_r['naver_id'] != None:
+				data_naver.append([before_r['naver_id'], before_r['naver_name']])
+			if r['id'] != before_r['id']:
+				data.append({ 'key': before_r['id'], 'name': before_r['apt_name'], 'danji': before_r['danji_flag'] })
+				data[-1]['naver'] = data_naver
+				data_naver = []
+		before_r = r
     
+	if before_r != None:
+		data.append({ 'key': before_r['id'], 'name': before_r['apt_name'], 'danji': before_r['danji_flag'] })
+		data[-1]['naver'] = data_naver
+
 	json_return=json.dumps(data)   #string #json
  
 	return jsonify(json_return)
@@ -503,4 +505,126 @@ def getRankByApt():
 
 	return jsonify(json_return)
 
+def decomposit_complex_info(data):
+
+    result = {}
+    result['id'] = data['id']
+    result['cate'] = data['cate']
+    result['name'] = data['name']
+
+    addrs = data['address'].split(' ')
+    if len(addrs) < 3:
+        return None
+
+    if addrs[2][-1] == '구' and addrs[1][-1] == '시' and len(addrs) > 3:
+        addrs[1] = addrs[1][:-1]+addrs[2]
+        addrs[2] = addrs[3]
+
+    result['region1'] = addrs[0]
+    result['region2'] = addrs[1]
+    result['region3'] = addrs[2]
+
+    tmp = addrs[len(addrs)-1].split('-')
+    result['jibun1'] = tmp[0]
+    result['jibun2'] = tmp[1] if len(tmp) > 1 else 0
+
+    result['family'] = int(data['family'][:-2])
+    result['dong'] = int(data['dong'][2:-1])
+    result['made_year'] = int(0 if data['approved'] == '-' else data['approved'][:4])
+
+    tmp = data['areas'].split(' ~ ')
+    result['min_area'] = tmp[0][:-1]
+    result['max_area'] = tmp[1][:-1] if len(tmp) > 1 else result['min_area']
+
+    return result
+
+SELECT_REGION_KEY = """
+	select region_key from region_info
+        where region_name=:region3 and level=3 
+		  and upper_region=
+            (select region_key from region_info
+                where level=2 and region_name=:region2 
+				  and upper_region=
+                    (select region_key from region_info
+                        where level=1 and region_name=:region1)
+            )
+"""
+
+INSERT_NAVER_COMPLEX = """
+	insert into naver_complex_info 
+		(id, category, name, family_cnt, dong_cnt, made_year, min_area, max_area, region_key, jibun1, jibun2)
+	values
+		(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
+@app.route("/saveNaverComplexInfo", methods=["POST"])
+def saveNaverComplexInfo():
+
+	data = decomposit_complex_info(request.form.to_dict())
+
+	region1 = data['region1']
+	region2 = data['region2']
+	region3 = data['region3']
+	if region1 == '서울시':
+		region1 = '서울특별시'
+	elif region1 == '대구시':
+		region1 = '대구광역시'
+	elif region1 == '인천시':
+		region1 = '인천광역시'
+	elif region1 == '부산시':
+		region1 = '부산광역시'
+	elif region1 == '광주시':
+		region1 = '광주광역시'
+	elif region1 == '대전시':
+		region1 = '대전광역시'
+	elif region1 == '울산시':
+		region1 = '울산광역시'
+	elif region1 == '세종시':
+		region1 = '세종특별자치시'
+	elif region1 == '제주도':
+		region1 = '제주특별자치도'
+
+	with app.engine.connect() as connection:
+		result = connection.execute(text(SELECT_REGION_KEY), region1 = region1, region2 = region2, region3 = region3)
+
+	r = result.first()
+	if r == None:
+		return jsonify({'result': 'Fail'})
+
+	del(data['region1'])
+	del(data['region2'])
+	del(data['region3'])
+	data['region_key'] = r['region_key']
+	
+	l = []
+	l.append(data['id'])
+	l.append(data['cate'])
+	l.append(data['name'])
+	l.append(data['family'])
+	l.append(data['dong'])
+	l.append(data['made_year'])
+	l.append(data['min_area'])
+	l.append(data['max_area'])
+	l.append(data['region_key'])
+	l.append(data['jibun1'])
+	l.append(data['jibun2'])
+	t = tuple(l)
+	rows = -1
+	try:
+		connection = app.engine.raw_connection()
+		cursor = connection.cursor()
+		cursor.execute(INSERT_NAVER_COMPLEX, t)
+		rows = cursor.rowcount
+		connection.commit()
+		cursor.close()
+	except Exception as e:
+		print(str(e))
+		print(data)
+		print(request.args.to_dict())
+		return jsonify({'result': 'Fail'})
+	finally:
+		connection.close()
+
+	print("saveNaverComplexInfo success : " + data['id'])
+	return jsonify({'result': 'OK'})
 

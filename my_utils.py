@@ -173,8 +173,8 @@ def job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym):
 	execute_dml(job_key, UPDATE_JOB_LOG_FAIL, (get_cnt, ins_cnt, del_cnt, apt_cnt, job_key), False)
 	if ym != None:
 		execute_dml(job_key, "delete from raw_data_new where ym = %s", (ym,))
-		execute_dml(job_key, "delete from apt_sale_new where ym = %s", (ym,))
-		execute_dml(job_key, "delete from apt_master where ym = %s", (ym,))
+		execute_dml(job_key, "delete from apt_sale_items where job_key = %s", (job_key,))
+		execute_dml(job_key, "delete from apt_master where job_key = %s", (job_key,))
 		execute_dml(job_key, "delete from apt_sale_stats where ym = %s", (ym,))
 		execute_dml(job_key, "delete from apt_ma_new where ym = %s", (ym,))
 		execute_dml(job_key, "delete from apt_region_ma where ym = %s", (ym,))
