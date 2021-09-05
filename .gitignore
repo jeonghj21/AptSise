@@ -3,6 +3,7 @@
 *.bak.*
 *.pid
 *.csv
+*.swp
 batch.sql
 config*.py
 tableexport.js
@@ -11,3 +12,4 @@ __pycache__/
 dump*.sql
 data/*.sql
 *.log.*
+update_dev.sh

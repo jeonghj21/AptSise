@@ -179,9 +179,45 @@ function refreshRegion(sel) {
 	
 	let arr = gRegionsMap[value]['subregions'];
 
+	if (!arr)
+		arr = [];
+
 	constructSel(child, arr, 'name' /* sort by name */, function(index, item) { return item['level'] == level+1; });
 
 }
+
+function showMap(juso, label) {
+	var container = document.getElementById('map'); //지도를 담을 영역의 DOM 레퍼런스
+	var callback = function(result, status) {
+    	if (status === kakao.maps.services.Status.OK) {
+			container.style.display = 'block';
+    		// 지도 중심을 이동 시킵니다
+			var options = { //지도를 생성할 때 필요한 기본 옵션
+				center: new kakao.maps.LatLng(result[0].y, result[0].x),
+				level: 3 //지도의 레벨(확대, 축소 정도)
+			};
+
+			map = new kakao.maps.Map(container, options); //지도 생성 및 객체 리턴
+			var marker = new kakao.maps.Marker({
+        		position: new kakao.maps.LatLng(result[0].y, result[0].x),
+        		text: label     
+    		});
+			marker.setMap(map);
+
+			var infowindow = new kakao.maps.InfoWindow({
+    			position : marker.position,
+    			content : '<div style="padding:5px;"><center>' + label + '</center></div>'
+			});
+
+			infowindow.open(map, marker);
+    	}
+	};
+
+	geocoder = new kakao.maps.services.Geocoder();
+	geocoder.addressSearch(juso, callback);
+
+}
+
 
 function refreshApt(apt) {
 
@@ -202,10 +238,17 @@ function refreshApt(apt) {
 		: null); 
 	var naverLinkFunc = 
 		function(data) { 
-			var html = "";
-			if (data['naver'] && data['naver'].length > 0) {
-				html = "<li value="+data['key']+"><a href=javascript:window.open('https://new.land.naver.com/complexes/"+data['naver'][0][0]+"');>"+data['name']+"</a></li>";
+			var html = "<li value="+data['key']+">";
+			if (data['naver']['id'] > 0) {
+				const naver_land = "https://new.land.naver.com/complexes/";
+				html += "<a href=javascript:window.open('" + naver_land + data['naver']['id'] + "');>"
+				html += data['name']+"</a>";
+				html += "&nbsp;&nbsp;<a href=\"javascript:showMap('" 
+					 + data['naver']['road_addr'] + "', '" + data['naver']['name'] + "');\">map</a>";
+			} else {
+				html += data['name'];
 			}
+			html += "</li>";
 			return html;
 		} 
 	if (aptArr && aptArr.length > 0) { // already cached
@@ -225,9 +268,11 @@ function refreshApt(apt) {
 		// 클릭한 옵션의 텍스트를 라벨 안에 넣음
 		const handleSelect = (item) => {
   			label.parentNode.classList.remove('active');
-  			label.innerHTML = item.textContent;
+			let name = item.textContent;
+			name = name.endsWith("map") ? name.substring(0, name.length-3) : name; 
+  			label.innerHTML = name;
 			item.parentNode.value = item.value;
-			item.parentNode.name = item.textContent;
+			item.parentNode.name = name;
 			$('#apt_btn').attr('disabled', item.value == '');
 		}
 
@@ -388,6 +433,12 @@ function changePriceGubun(gubun) {
 
 	// $('.price_text').text(gPriceGubun[parseInt(gubun)].title);
 	let priceGubun = PriceGubun.getPriceGubun(gubun);
+
+	for(var i = 0; i < myChart['data']['datasets'].length; i++) {
+		let key = myChart['data']['datasets'][i].label;
+		chart = gChartData.get(key);
+		chart.params['price_gubun'] = gubun;
+	}
 
 	$('.price_text').text(priceGubun.title);
 
@@ -1298,6 +1349,10 @@ function setDataRelative(mainData, maData) {
 
 function drawChart(title, labels, data, params, chartOptions){
 
+	let map = document.getElementById("map");
+	if (map)
+		map.style.display = 'none';
+
 	//var priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
 	const priceGubun = PriceGubun.getPriceGubun(params);
 	const mainData = data[priceGubun.price_name];
@@ -1446,7 +1501,7 @@ function makeChartConditionTitle(title, params, toIgnoreParams = []) {
 	if (!toIgnoreParams['danji']) {
 		const danji = getConditionParam(params, 'danji');
     	if (danji == "Y"){
-      		title += "등록된 단지만";
+      		title += "300세대 이상만";
     	} else {
       		title += "모든 실거래";
     	}
@@ -1697,6 +1752,10 @@ function initParamAndOption4RankChart(params) {
 
 function drawRankChart(gubun, params) {
 	
+	let map = document.getElementById("map");
+	if (map)
+		map.style.display = 'none';
+
 	initParamAndOption4RankChart(params);
 
 	let url = getRankChartURL(gubun, params);
