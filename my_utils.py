@@ -169,23 +169,25 @@ def execute_dml(job_key, sql, params = None, job_log = True):
 
 	return rows
 
-def job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym):
+def job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym, del_data = True, del_stat = True):
 	execute_dml(job_key, UPDATE_JOB_LOG_FAIL, (get_cnt, ins_cnt, del_cnt, apt_cnt, job_key), False)
-	if ym != None:
+	if ym != None and del_data:
 		execute_dml(job_key, "delete from raw_data_new where ym = %s", (ym,))
 		execute_dml(job_key, "delete from apt_sale_items where job_key = %s", (job_key,))
 		execute_dml(job_key, "delete from apt_master where job_key = %s", (job_key,))
+		execute_dml(job_key, "delete from apt_sale_deleted where ym = %s", (ym,))
+	if ym != None and del_stat:
 		execute_dml(job_key, "delete from apt_sale_stats where ym = %s", (ym,))
 		execute_dml(job_key, "delete from apt_ma_new where ym = %s", (ym,))
 		execute_dml(job_key, "delete from apt_region_ma where ym = %s", (ym,))
-		execute_dml(job_key, "delete from apt_qbox_stats where ym = %s", (ym,))
-		execute_dml(job_key, "delete from apt_sale_deleted where ym = %s", (ym,))
+	execute_dml(job_key, "delete from apt_qbox_stats where ym = %s", (ym,))
+
 	sys.exit(1)
 
 def job_start(job_name, job_key, ym):
 	execute_dml(job_key, INSERT_JOB_LOG, (job_name, job_key, ym))
 
-def job_finish(job_key, get_cnt, ins_cnt, del_cnt, apt_cnt):
+def job_finish(job_key, get_cnt, apt_cnt, ins_cnt, del_cnt):
 	execute_dml(job_key, UPDATE_JOB_LOG_SUCCESS, (get_cnt, ins_cnt, del_cnt, apt_cnt, job_key))
 
 

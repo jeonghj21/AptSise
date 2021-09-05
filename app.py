@@ -171,7 +171,7 @@ def getSale():
  
 	return jsonify(json_return)
 
-SELECT_REGIONS_ALL = "select region_key, region_name, upper_region, level from region_info where level <= 3 order by level, upper_region, region_key"
+SELECT_REGIONS_ALL = "select region_key, region_name, upper_region, level, apt_yn from region_info where level <= 3 order by level, upper_region, region_key"
 @app.route("/getRegions")
 def getRegions():
 
@@ -181,7 +181,7 @@ def getRegions():
 		result = connection.execute(text(SELECT_REGIONS_ALL))
 	
 	for res in result:
-		region = { 'key': res['region_key'], 'name': res['region_name'], 'level': res['level'], 'upper': res['upper_region'] }
+		region = { 'key': res['region_key'], 'name': res['region_name'], 'level': res['level'], 'upper': res['upper_region'], 'apt_yn': res['apt_yn'] }
 		regions.append(region)
 
 	json_return=json.dumps(regions)   #string #json
@@ -189,7 +189,8 @@ def getRegions():
 	return jsonify(json_return)
 
 SELECT_APT_MASTER = """
-	select a.id, apt_name, ifnull(danji_flag, 'N') danji_flag, n.id naver_id, n.name naver_name 
+	select a.id, apt_name, ifnull(danji_flag, 'N') danji_flag
+		 , n.id naver_id, n.name naver_name, a.jibun1, a.jibun2, n.road_addr
 		from apt_master a 
 		left join naver_complex_info n 
 			on ifnull(a.naver_id, 0) = n.id    
@@ -206,22 +207,11 @@ def getApt():
 		result = connection.execute(text(SELECT_APT_MASTER), region=region_key)
 
 	data = []
-	data_naver = []
-	before_r = None
 	for r in result:
-		if before_r != None:
-			if before_r['naver_id'] != None:
-				data_naver.append([before_r['naver_id'], before_r['naver_name']])
-			if r['id'] != before_r['id']:
-				data.append({ 'key': before_r['id'], 'name': before_r['apt_name'], 'danji': before_r['danji_flag'] })
-				data[-1]['naver'] = data_naver
-				data_naver = []
-		before_r = r
+		data_naver = {'id': r['naver_id'], 'name': r['naver_name'], \
+					  'jibun1': r['jibun1'], 'jibun2': r['jibun2'], 'road_addr': r['road_addr']}
+		data.append({ 'key': r['id'], 'name': r['apt_name'], 'danji': r['danji_flag'], 'naver': data_naver })
     
-	if before_r != None:
-		data.append({ 'key': before_r['id'], 'name': before_r['apt_name'], 'danji': before_r['danji_flag'] })
-		data[-1]['naver'] = data_naver
-
 	json_return=json.dumps(data)   #string #json
  
 	return jsonify(json_return)
@@ -505,12 +495,7 @@ def getRankByApt():
 
 	return jsonify(json_return)
 
-def decomposit_complex_info(data):
-
-    result = {}
-    result['id'] = data['id']
-    result['cate'] = data['cate']
-    result['name'] = data['name']
+def adjust_complex_info(data):
 
     addrs = data['address'].split(' ')
     if len(addrs) < 3:
@@ -520,23 +505,22 @@ def decomposit_complex_info(data):
         addrs[1] = addrs[1][:-1]+addrs[2]
         addrs[2] = addrs[3]
 
-    result['region1'] = addrs[0]
-    result['region2'] = addrs[1]
-    result['region3'] = addrs[2]
+    data['region1'] = addrs[0]
+    data['region2'] = addrs[1]
+    data['region3'] = addrs[2]
 
     tmp = addrs[len(addrs)-1].split('-')
-    result['jibun1'] = tmp[0]
-    result['jibun2'] = tmp[1] if len(tmp) > 1 else 0
+    data['jibun1'] = tmp[0]
+    data['jibun2'] = tmp[1] if len(tmp) > 1 else 0
 
-    result['family'] = int(data['family'][:-2])
-    result['dong'] = int(data['dong'][2:-1])
-    result['made_year'] = int(0 if data['approved'] == '-' else data['approved'][:4])
+    data['family'] = int(data['family'][:-2])
+    data['dong'] = int(data['dong'][2:-1])
+    data['made_year'] = int(0 if data['approved'] == '-' else data['approved'][:4])
 
     tmp = data['areas'].split(' ~ ')
-    result['min_area'] = tmp[0][:-1]
-    result['max_area'] = tmp[1][:-1] if len(tmp) > 1 else result['min_area']
+    data['min_area'] = tmp[0][:-1]
+    data['max_area'] = tmp[1][:-1] if len(tmp) > 1 else data['min_area']
 
-    return result
 
 SELECT_REGION_KEY = """
 	select region_key from region_info
@@ -552,15 +536,16 @@ SELECT_REGION_KEY = """
 
 INSERT_NAVER_COMPLEX = """
 	insert into naver_complex_info 
-		(id, category, name, family_cnt, dong_cnt, made_year, min_area, max_area, region_key, jibun1, jibun2)
+		(id, category, name, family_cnt, dong_cnt, made_year, min_area, max_area, region_key, jibun1, jibun2, road_addr)
 	values
-		(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+		(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
 @app.route("/saveNaverComplexInfo", methods=["POST"])
 def saveNaverComplexInfo():
 
-	data = decomposit_complex_info(request.form.to_dict())
+	data = request.form.to_dict()
+	adjust_complex_info(data)
 
 	region1 = data['region1']
 	region2 = data['region2']
@@ -608,6 +593,7 @@ def saveNaverComplexInfo():
 	l.append(data['region_key'])
 	l.append(data['jibun1'])
 	l.append(data['jibun2'])
+	l.append(data['road_addr'])
 	t = tuple(l)
 	rows = -1
 	try:

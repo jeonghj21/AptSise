@@ -1,4 +1,3 @@
-from flask import Flask
 from sqlalchemy import create_engine, text
 import pandas as pd
 import xml.etree.ElementTree as ET
@@ -14,14 +13,20 @@ import my_utils
 from_ym = None 
 to_ym = None
 reuse_tmp_data = False
+stats_only = False
+qbox_only = False
 for arg in sys.argv:
-	if arg[0:9] == "-from_ym=":
-		from_ym = arg[9:]
-	elif arg[0:7] == "-to_ym=":
-		to_ym = arg[7:]
-	elif arg[0:16] == "--reuse_tmp_data":
+	arg = arg.split("=", 1)
+	if arg[0][1:] == "from_ym":
+		from_ym = arg[1]
+	elif arg[0][1:] == "to_ym":
+		to_ym = arg[1]
+	elif arg[0][1:] == "reuse_tmp_data":
 		reuse_tmp_data = True
-
+	elif arg[0][1:] == "stats_only":
+		stats_only = True
+	elif arg[0][1:] == "qbox_only":
+		qbox_only = True
 
 JOB_PREFIX = "SALES"
 
@@ -139,9 +144,11 @@ UPDATE_TMP_RAW_MADE_YEAR2 = """
 		where 건축년도 is null
 """
 
-def items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym):
+def items_job_fail( job_key, ym, get_cnt=0, apt_cnt=0, ins_cnt=0, del_cnt=0):
 	os.remove(PID_FILE)
-	my_utils.job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
+	my_utils.job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym, \
+				not (stats_only or qbox_only), not qbox_only)
+	logger.info(ym + " : Failed")
 
 def get_and_load_data(job_key, ym, regions, columns, fname):
 	URL = "http://openapi.molit.go.kr/OpenAPI_ToolInstallPackage/service/rest/RTMSOBJSvc/getRTMSDataSvcAptTradeDev"
@@ -173,7 +180,7 @@ def get_and_load_data(job_key, ym, regions, columns, fname):
 	items.to_csv(fname, index=False,encoding="utf-8")
 
 	if my_utils.execute_dml(job_key, LOAD_INTO_TMP_RAW_DATA, (fname,)) < 0:
-		items_job_fail(total_count, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym, total_count)
 
 	return total_count
 
@@ -255,33 +262,78 @@ INSERT_APT_SALE_STATS_LEVEL_1 = """
 INSERT_APT_SALE_STATS_LEVEL_0 = """
 	insert into apt_sale_stats
 		select '0000000000', 0, made_year, area_type, ym, danji_flag
-			 , round((sum(unit_price * cnt) / sum(cnt)), 2), round((sum(price * cnt) / sum(cnt)), 2), sum(cnt)
+			 , round((sum(unit_price * cnt) / sum(cnt)), 2)
+			 , round((sum(price * cnt) / sum(cnt)), 2)
+			 , sum(cnt)
 	 	  from apt_sale_stats a
 	 	 where a.ym = %s
 		   and a.level = 1
 	 	 group by made_year, area_type, ym, danji_flag
 """
 
-INSERT_QBOX_STATS_1 = """
+INSERT_QBOX_STATS_COMMON = """
 insert into apt_qbox_stats   
-		select region_key, level, '1', danji, ym
-			 , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
-			 , cast(substr(min_price_id, 1, 12) as double), cast(substr(min_price_id, 13, 12) as signed integer)
+		select region_key, level, %s, %s, ym
+			 , cast(substr(max_price_id, 1, 12) as double)
+			 , cast(substr(max_price_id, 13, 12) as signed integer)
+			 , cast(substr(min_price_id, 1, 12) as double)
+			 , cast(substr(min_price_id, 13, 12) as signed integer)
 			 , 1q_price, 3q_price, med_price, avg_price
-		  from (             
-		  	select a.ym, r.region_key, r.level, ifnull(danji_flag, 'N') danji
-				 , max(concat(lpad(price/(area/3.3),12,'0'),lpad(a.id,12,'0'))) max_price_id
-				 , min(concat(lpad(price/(area/3.3),12,'0'),lpad(a.id,12,'0'))) min_price_id          
-			 	 , substring_index(substring_index(group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ','), ',', (((50 / 100) * count(0)) + 1)),',',-1) as med_price
-			 	 , substring_index(substring_index(group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ','), ',', (((25 / 100) * count(0)) + 1)),',',-1) as 1q_price
-			 	 , substring_index(substring_index(group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ','), ',', (((75 / 100) * count(0)) + 1)),',',-1) as 3q_price
-				 , round(avg(price), 2) avg_price
 """
 
-QBOX_FROMs = [" from region_info r, apt_sale_items a, apt_master m"
-			 , " from region_info r, region_info r1, apt_sale_items a, apt_master m" 
-			 , " from region_info r, region_info r1, region_info r2, apt_sale_items a, apt_master m"
-			 , " from (select '0000000000' region_key, 0 level from dual) r, apt_sale_items a, apt_master m"]
+INSERT_QBOX_STATS = [
+"""
+		  from (             
+		  	select a.ym, r.region_key, r.level
+				 , max(concat(lpad(price/(area/3.3),12,'0'),lpad(a.id,12,'0'))) max_price_id
+				 , min(concat(lpad(price/(area/3.3),12,'0'),lpad(a.id,12,'0'))) min_price_id          
+			 	 , substring_index(
+				 		substring_index(
+				 			group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ',')
+									, ',', (((50 / 100) * count(0)) + 1))
+						,',',-1) as med_price
+			 	 , substring_index(
+				 		substring_index(
+							group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ',')
+									, ',', (((25 / 100) * count(0)) + 1))
+							,',',-1) as 1q_price
+			 	 , substring_index(
+				 		substring_index(
+							group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ',')
+									, ',', (((75 / 100) * count(0)) + 1))
+							,',',-1) as 3q_price
+				 , round(avg(price), 2) avg_price
+""",
+"""
+		  from (             
+		  	select a.ym, r.region_key, r.level
+				 , max(concat(lpad(price,12,'0'),lpad(a.id,12,'0'))) max_price_id
+				 , min(concat(lpad(price,12,'0'),lpad(a.id,12,'0'))) min_price_id          
+			 	 , substring_index(
+				 		substring_index(
+							group_concat(price order by price asc separator ',')
+							, ',', (((50 / 100) * count(0)) + 1))
+						,',',-1) as med_price
+			 	 , substring_index(
+				 		substring_index(
+							group_concat(price order by price asc separator ',')
+							, ',', (((25 / 100) * count(0)) + 1))
+						,',',-1) as 1q_price
+			 	 , substring_index(
+				 		substring_index(
+							group_concat(price order by price asc separator ',')
+								, ',', (((75 / 100) * count(0)) + 1))
+						,',',-1) as 3q_price
+				 , round(avg(price), 2) avg_price
+"""
+]
+
+QBOX_FROMs = [
+	" from region_info r, apt_sale_items a, apt_master m", 
+	" from region_info r, region_info r1, apt_sale_items a, apt_master m" , 
+	" from region_info r, region_info r1, region_info r2, apt_sale_items a, apt_master m", 
+	" from (select '0000000000' region_key, 0 level from dual) r, apt_sale_items a, apt_master m"
+]
 
 QBOX_WHEREs = [
 """
@@ -314,87 +366,79 @@ QBOX_WHEREs = [
 """
 ]
 
-INSERT_QBOX_STATS_2 = """
-insert into apt_qbox_stats   
-		select region_key, level, '2', danji, ym
-			 , cast(substr(max_price_id, 1, 12) as double), cast(substr(max_price_id, 13, 12) as signed integer)
-			 , cast(substr(min_price_id, 1, 12) as double), cast(substr(min_price_id, 13, 12) as signed integer)
-			 , 1q_price, 3q_price, med_price, avg_price
-		  from (             
-		  	select a.ym, r.region_key, r.level, ifnull(danji_flag, 'N') danji
-				 , max(concat(lpad(price,12,'0'),lpad(a.id,12,'0'))) max_price_id
-				 , min(concat(lpad(price,12,'0'),lpad(a.id,12,'0'))) min_price_id          
-			 	 , substring_index(substring_index(group_concat(price order by price asc separator ','), ',', (((50 / 100) * count(0)) + 1)),',',-1) as med_price
-			 	 , substring_index(substring_index(group_concat(price order by price asc separator ','), ',', (((25 / 100) * count(0)) + 1)),',',-1) as 1q_price
-			 	 , substring_index(substring_index(group_concat(price order by price asc separator ','), ',', (((75 / 100) * count(0)) + 1)),',',-1) as 3q_price
-				 , round(avg(price), 2) avg_price
-"""
+SELECT_QBOX_AREA_AND_YEAR_ALL = "			 , '00', 0"
+SELECT_QBOX_AREA_AND_YEAR = "			 , area_type, made_year"
 
-QBOX_END = " group by a.ym, r.region_key, r.level, ifnull(danji_flag, 'N')) a"
+QBOX_END = " group by a.ym, r.region_key, r.level, a.area_type, m.made_year) a"
+QBOX_END_ALL = " group by a.ym, r.region_key, r.level) a"
 
 
 def update_stats(job_key, ym):
 
 	rows = my_utils.execute_dml(job_key, DELETE_APT_SALE_STATS_NEW, (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_STATS_ALL, (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_STATS_DANJI_Y, (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_STATS_LEVEL_2, (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_STATS_LEVEL_1, (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_STATS_LEVEL_0, (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, DELETE_APT_MA, (ym, ym))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_MA, (ym, ym))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, DELETE_APT_REGION_MA, (ym, ym))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_REGION_MA, (ym, ym))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
+def save_qbox_stat(add_select, add_where, group_by, ym, danji):
+	for i in range(0, 4):
+		for j in range(1, 3):
+			sql = INSERT_QBOX_STATS_COMMON + add_select \
+				+ INSERT_QBOX_STATS[j-1] + add_select + QBOX_FROMs[i] \
+				+ QBOX_WHEREs[i] + add_where + group_by
+			my_utils.execute_dml(job_key, "SET GROUP_CONCAT_MAX_LEN = 4294967295")
+			rows = my_utils.execute_dml(job_key, sql, (str(j), danji, ym))
+			if rows < 0:
+				items_job_fail(job_key, ym)
 
 def update_qbox_stats(job_key, ym):
 
 	rows = my_utils.execute_dml(job_key, "delete from apt_qbox_stats where ym = %s", (ym,))
 	if rows < 0:
-		job_fail(0, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym)
 
-	my_utils.execute_dml(job_key, "SET GROUP_CONCAT_MAX_LEN = 4294967295")
-	for i in range(0, 4):
-		sql = INSERT_QBOX_STATS_1 + QBOX_FROMs[i] + QBOX_WHEREs[i] + QBOX_END
-		rows = my_utils.execute_dml(job_key, sql, (ym,))
-		if rows < 0:
-			job_fail(0, 0, 0, 0, job_key, ym)
+#	for each area_type, made_year
+	save_qbox_stat(SELECT_QBOX_AREA_AND_YEAR, "", QBOX_END, ym, 'N')
+	save_qbox_stat(SELECT_QBOX_AREA_AND_YEAR, " and m.danji_flag='Y'", QBOX_END, ym, 'Y')
 
-	for i in range(0, 4):
-		sql = INSERT_QBOX_STATS_2 + QBOX_FROMs[i] + QBOX_WHEREs[i] + QBOX_END
-		rows = my_utils.execute_dml(job_key, sql, (ym,))
-		if rows < 0:
-			job_fail(0, 0, 0, 0, job_key, ym)
-
+#	for all area_type, made_year
+	save_qbox_stat(SELECT_QBOX_AREA_AND_YEAR_ALL, "", QBOX_END_ALL, ym, 'N')
+	save_qbox_stat(SELECT_QBOX_AREA_AND_YEAR_ALL, " and m.danji_flag='Y'", QBOX_END_ALL, ym, 'Y')
 
 if os.path.isfile(PID_FILE):
 	logger.error("PID file already exists!! " + PID_FILE)
@@ -432,8 +476,14 @@ INSERT_APT_MASTER_NEW = """
 				   , 건축년도 made_year, %s job_key, 법정동본번코드 jibun1, 법정동부번코드 jibun2
 				   , (select id from naver_complex_info n
 				       where region_key = concat(t.법정동시군구코드, t.법정동읍면동코드)
-					     and jibun1 = t.법정동본번코드
-						 and jibun2 = t.법정동부번코드
+		  				 and jibun1
+		    			   = (case when t.법정동본번코드 regexp('^[0-9]+$') 
+						   				then cast(t.법정동본번코드 as signed int)
+		  		  				   else replace(t.법정동본번코드, '산', '') end)
+		  				 and jibun2
+		    			   = (case when t.법정동부번코드 regexp('^[0-9]+$') 
+						   				then cast(t.법정동부번코드 as signed int)
+		  		  				   else replace(t.법정동부번코드, '산', '') end)
 					   order by t.건축년도 - made_year, category
 					   limit 1) naver_id
 				from tmp_raw_data2_new t      
@@ -458,6 +508,17 @@ UPDATE_TMP_RAW_DATA2 = """
 """
 
 SELECT_APT_ID_NULL = "select * from tmp_raw_data2_new where apt_id is null"
+
+UPDATE_REGION3_APT_YN = """
+	update region_info r set apt_yn = 'Y'
+	  where region_key in (select concat(법정동시군구코드, 법정동읍면동코드) from tmp_raw_data2_new )
+"""
+
+UPDATE_REGION2_APT_YN = """
+	update region_info r set apt_yn = 'Y'       
+	 where exists (
+	 	select 1 from (select * from region_info where upper_region=r.region_key and apt_yn = 'Y') a)
+"""
 
 INSERT_APT_SALE_ITEMS = """
 	insert into apt_sale_items
@@ -516,94 +577,120 @@ INSERT_APT_SALE_DELETED = """
 			) a 
 """
 
-for ym in YMs: 
-	ym_start_dt = datetime.datetime.now()
-	job_key = JOB_PREFIX + "_" + ym_start_dt.strftime('%Y%m%d%H%M%S')
-	logger.info(ym + " : starting...")
-	my_utils.job_start(JOB_NAME, job_key, ym)
+def save_tmp_raw_data(job_key, ym):
 
-	get_cnt = ins_cnt = del_cnt = apt_cnt = 0 
+	if my_utils.execute_dml(job_key, "truncate tmp_raw_data_new") < 0:
+		items_job_fail(job_key, ym)
 
-	my_utils.execute_dml(job_key,"delete from tmp_ym where ym='"+ym+"'")
-	my_utils.execute_dml(job_key,"insert into tmp_ym values('"+ym+"')")
+	start_dt = datetime.datetime.now()
+	logger.info("get_and_load starting...")
+
+	CSV_FILE = os.path.join(app.config['BASE_DIR'], "%s_%s.csv" %(ym, job_key))
+	counts[GET_CNT] = get_and_load_data(job_key, ym, regions, columns, CSV_FILE);
+	logger.info("get_and_load Completed(" + str(datetime.datetime.now() - start_dt) + ") : " + str(counts[GET_CNT]))
+
+	os.remove(CSV_FILE)
+
+	if my_utils.execute_dml(job_key, "update tmp_raw_data_new set 법정동시군구코드 = '36111' where 법정동시군구코드 = '36110'") < 0:
+		items_job_fail(job_key, ym, counts[GET_CNT])
+	if my_utils.execute_dml(job_key, "update tmp_raw_data_new set 법정동읍면동코드 = '32000' where 법정동시군구코드 = '41461' and (법정동읍면동코드 = '25931')") < 0:
+		items_job_fail(job_key, ym, counts[GET_CNT])
+	rows = my_utils.execute_dml(job_key, INSERT_RAW_DATA_ERROR)
+	if rows > 0:
+		update4 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL4, (job_key,))
+		update5 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL5, (job_key,))
+		if rows !=update4 + update5:
+			logger.error("CHCK!!! tmp_raw_data_error Not All Updated : invalid = " + str(rows) + ", updated4 = " + str(update4) + ", updated5 = " + str(update5))
+			items_job_fail(job_key, ym, counts[GET_CNT])
+
+	return counts[GET_CNT]
+
+GET_CNT = 0
+INS_CNT = 1
+DEL_CNT = 2
+APT_CNT = 3
+def save_sale_items(job_key, ym):
+
 	my_utils.execute_dml(job_key, "truncate tmp_raw_data2_new")
 #	my_utils.execute_dml(job_key, "truncate tmp_raw_data_error")
 
-	CSV_FILE = os.path.join(app.config['BASE_DIR'], "%s_%s.csv" %(ym, job_key))
+	counts = [0, 0, 0, 0]
+
 	if reuse_tmp_data != True:
-		if my_utils.execute_dml(job_key, "truncate tmp_raw_data_new") < 0:
-			items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
-
-		start_dt = datetime.datetime.now()
-		logger.info("get_and_load starting...")
-		get_cnt = get_and_load_data(job_key, ym, regions, columns, CSV_FILE);
-		logger.info("get_and_load Completed(" + str(datetime.datetime.now() - start_dt) + ") : " + str(get_cnt))
-
-		if my_utils.execute_dml(job_key, "update tmp_raw_data_new set 법정동시군구코드 = '36111' where 법정동시군구코드 = '36110'") < 0:
-			items_job_fail(get_cnt, 0, 0, 0, job_key, ym)
-		if my_utils.execute_dml(job_key, "update tmp_raw_data_new set 법정동읍면동코드 = '32000' where 법정동시군구코드 = '41461' and (법정동읍면동코드 = '25931')") < 0:
-			items_job_fail(get_cnt, 0, 0, 0, job_key, ym)
-		rows = my_utils.execute_dml(job_key, INSERT_RAW_DATA_ERROR)
-		if rows > 0:
-			update4 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL4, (job_key,))
-			update5 = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_REGION_LEVEL5, (job_key,))
-			if rows !=update4 + update5:
-				logger.error("CHCK!!! tmp_raw_data_error Not All Updated : invalid = " + str(rows) + ", updated4 = " + str(update4) + ", updated5 = " + str(update5))
-				items_job_fail(get_cnt, 0, 0, 0, job_key, ym)
-
+		counts[GET_CNT] = save_tmp_raw_data(job_key, ym)
+		
 	if my_utils.execute_dml(job_key, UPDATE_TMP_RAW_MADE_YEAR1) < 0:
-		items_job_fail(get_cnt, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT])
 
 	if my_utils.execute_dml(job_key, UPDATE_TMP_RAW_MADE_YEAR2) < 0:
-		items_job_fail(get_cnt, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT])
 
 	if my_utils.execute_dml(job_key, INSERT_TMP_RAW_DATA2, (ym,)) < 0:
-		items_job_fail(get_cnt, 0, 0, 0, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT])
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_MASTER_NEW, (job_key,))
 	if rows < 0:
-		items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
-	apt_cnt = rows
+		items_job_fail(job_key, ym, counts[GET_CNT])
+	counts[APT_CNT] = rows
 
 	rows = my_utils.execute_dml(job_key, UPDATE_TMP_RAW_DATA2)
 	if rows < 0:
-		items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT])
 
 	rows = my_utils.execute_dml(job_key, SELECT_APT_ID_NULL)
 	if rows != 0:
 		logger.error("CHCK!!! apt_id null exists : " + str(rows))
-		items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT])
+
+	rows = my_utils.execute_dml(job_key, UPDATE_REGION3_APT_YN)
+	if rows < 0:
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT])
+
+	rows = my_utils.execute_dml(job_key, UPDATE_REGION2_APT_YN)
+	if rows < 0:
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT])
 
 	rows = my_utils.execute_dml(job_key, INSERT_RAW_DATA)
 	if rows < 0:
-		items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT])
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_ITEMS, (job_key,))
 	if rows < 0:
-		items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
-	ins_cnt = rows
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT])
+	counts[INS_CNT] = rows
 
 	rows = my_utils.execute_dml(job_key, INSERT_APT_SALE_DELETED, (job_key, ym, ym))
 	if rows < 0:
-		items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
+		items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT], counts[INS_CNT])
 	elif rows > 0:
 		rows = my_utils.execute_dml(job_key, DELETE_APT_SALE_ITEMS, (ym, job_key)) 
 		if rows < 0:
-			items_job_fail(get_cnt, ins_cnt, del_cnt, apt_cnt, job_key, ym)
-		del_cnt = rows
-	else:
-		del_cnt = 0
+			items_job_fail(job_key, ym, counts[GET_CNT], counts[APT_CNT], counts[INS_CNT])
+		counts[DEL_CNT] = rows
 
-	update_stats(job_key, ym)
+	return counts
+
+for ym in YMs: 
+	ym_start_dt = datetime.datetime.now()
+	job_key = JOB_PREFIX + "_" + ym_start_dt.strftime('%Y%m%d%H%M%S')
+	logger.info(ym + " : starting..." + "stats_only = " + str(stats_only) + ", qbox_only = " + str(qbox_only))
+	my_utils.job_start(JOB_NAME, job_key, ym)
+
+	my_utils.execute_dml(job_key,"delete from tmp_ym where ym='"+ym+"'")
+	my_utils.execute_dml(job_key,"insert into tmp_ym values('"+ym+"')")
+
+	counts = [0, 0, 0, 0]
+	if not (stats_only or qbox_only):
+		counts = save_sale_items(job_key, ym)
+
+	if not qbox_only:
+		update_stats(job_key, ym)
 	update_qbox_stats(job_key, ym)
 
-	ym_end_dt = datetime.datetime.now()
-	logger.info(ym + " : Completed(" + str(ym_end_dt - ym_start_dt) + ")")
-	my_utils.job_finish(job_key, get_cnt, ins_cnt, del_cnt, apt_cnt)
+	my_utils.job_finish(job_key, counts[GET_CNT], counts[APT_CNT], counts[INS_CNT], counts[DEL_CNT])
 
-	logger.info(ym + " : Completed(" + str(ym_end_dt - ym_start_dt) + ") : " + str(ins_cnt))
-	if os.path.isfile(CSV_FILE):
-		os.remove(CSV_FILE)
+	ym_end_dt = datetime.datetime.now()
+	logger.info(ym + " : Completed(" + str(ym_end_dt - ym_start_dt) + ") : " + str(counts[GET_CNT]))
 
 
 logger.info("Completed!!")

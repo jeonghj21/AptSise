@@ -10,6 +10,7 @@
 </head>
 {% include 'container.html' %}
 <div style='width:100%; margin:20px;'>
+	<div id="map" style="width:100%; height: 100vh; display:none;"></div>
 	<div id="chartLegend" class="chart-btn-container"></div>
     <canvas id="myChart"></canvas>
 </div>
@@ -27,6 +28,7 @@
 <tbody></tbody>
 </table>
 </div>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=816341078d92b651522a5cfccdf56dfe&libraries=services"></script>
 <script>
 BASE_URL = "{{ config['BASE_URL'] }}";
 $(document).ready(function(){ 
@@ -61,6 +63,8 @@ $(document).ready(function(){
 				continue;
 			if (level == 1)
 				gRegionsArr.push(region);
+			if (level > 1 && region['apt_yn'] != 'Y')
+				continue;
 			let upper = gRegionsMap[region['upper']];
 			if (!upper['subregions'])
 				upper['subregions'] = [];
