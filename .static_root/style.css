@@ -75,7 +75,7 @@ div.white_content {
   width: 100%;
   height: 20px;
   border-radius: 4px;
-  background: url('https://freepikpsd.com/media/2019/10/down-arrow-icon-png-7-Transparent-Images.png') calc(100% - 7px) center no-repeat;
+  background: url('images/down-arrow-icon-png-7-Transparent-Images.png') calc(100% - 7px) center no-repeat;
   border: 2px solid lightcoral;
   background-size: 20px;
   cursor: pointer;

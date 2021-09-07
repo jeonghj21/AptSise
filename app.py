@@ -495,33 +495,6 @@ def getRankByApt():
 
 	return jsonify(json_return)
 
-def adjust_complex_info(data):
-
-    addrs = data['address'].split(' ')
-    if len(addrs) < 3:
-        return None
-
-    if addrs[2][-1] == '구' and addrs[1][-1] == '시' and len(addrs) > 3:
-        addrs[1] = addrs[1][:-1]+addrs[2]
-        addrs[2] = addrs[3]
-
-    data['region1'] = addrs[0]
-    data['region2'] = addrs[1]
-    data['region3'] = addrs[2]
-
-    tmp = addrs[len(addrs)-1].split('-')
-    data['jibun1'] = tmp[0]
-    data['jibun2'] = tmp[1] if len(tmp) > 1 else 0
-
-    data['family'] = int(data['family'][:-2])
-    data['dong'] = int(data['dong'][2:-1])
-    data['made_year'] = int(0 if data['approved'] == '-' else data['approved'][:4])
-
-    tmp = data['areas'].split(' ~ ')
-    data['min_area'] = tmp[0][:-1]
-    data['max_area'] = tmp[1][:-1] if len(tmp) > 1 else data['min_area']
-
-
 SELECT_REGION_KEY = """
 	select region_key from region_info
         where region_name=:region3 and level=3 
@@ -533,6 +506,50 @@ SELECT_REGION_KEY = """
                         where level=1 and region_name=:region1)
             )
 """
+REGIONs = {'서울시':'서울특별시', '대구시':'대구광역시', '인천시':'인천광역시', '부산시':'부산광역시', \
+		   '광주시':'광주광역시', '대전시':'대전광역시', '울산시':'울산광역시', '세종시':'세종특별자치시', \
+		   '제주도':'제주특별자치도' }
+
+def adjust_complex_info(data):
+
+	addrs = data['address'].split(' ')
+	if len(addrs) < 3:
+		return None
+
+	if addrs[2][-1] == '구' and addrs[1][-1] == '시' and len(addrs) > 3:
+		addrs[1] = addrs[1][:-1]+addrs[2]
+		addrs[2] = addrs[3]
+
+	data['region1'] = addrs[0]
+	data['region2'] = addrs[1]
+	data['region3'] = addrs[2]
+
+	if data['region1'] in REGIONs:
+		data['region1'] = REGIONs[data['region1']]
+
+	tmp = addrs[len(addrs)-1].split('-')
+	data['jibun1'] = tmp[0]
+	data['jibun2'] = tmp[1] if len(tmp) > 1 else 0
+
+	data['family'] = int(data['family'][:-2])
+	data['dong'] = int(data['dong'][2:-1])
+	data['made_year'] = int(0 if data['approved'] == '-' else data['approved'][:4])
+
+	tmp = data['areas'].split(' ~ ')
+	data['min_area'] = tmp[0][:-1]
+	data['max_area'] = tmp[1][:-1] if len(tmp) > 1 else data['min_area']
+
+	with app.engine.connect() as connection:
+		result = connection.execute(text(SELECT_REGION_KEY), \
+				region1 = data['region1'], region2 = data['region2'], region3 = data['region3'])
+
+	r = result.first()
+	if r == None:
+		return None
+
+	data['region_key'] = r['region_key']
+	
+
 
 INSERT_NAVER_COMPLEX = """
 	insert into naver_complex_info 
@@ -541,59 +558,19 @@ INSERT_NAVER_COMPLEX = """
 		(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
+KEYs = ['id', 'cate', 'name', 'family', 'dong', 'made_year', 'min_area', 'max_area', \
+		'region_key', 'jibun1', 'jibun2', 'road_addr']
+
 @app.route("/saveNaverComplexInfo", methods=["POST"])
 def saveNaverComplexInfo():
 
 	data = request.form.to_dict()
 	adjust_complex_info(data)
 
-	region1 = data['region1']
-	region2 = data['region2']
-	region3 = data['region3']
-	if region1 == '서울시':
-		region1 = '서울특별시'
-	elif region1 == '대구시':
-		region1 = '대구광역시'
-	elif region1 == '인천시':
-		region1 = '인천광역시'
-	elif region1 == '부산시':
-		region1 = '부산광역시'
-	elif region1 == '광주시':
-		region1 = '광주광역시'
-	elif region1 == '대전시':
-		region1 = '대전광역시'
-	elif region1 == '울산시':
-		region1 = '울산광역시'
-	elif region1 == '세종시':
-		region1 = '세종특별자치시'
-	elif region1 == '제주도':
-		region1 = '제주특별자치도'
-
-	with app.engine.connect() as connection:
-		result = connection.execute(text(SELECT_REGION_KEY), region1 = region1, region2 = region2, region3 = region3)
-
-	r = result.first()
-	if r == None:
-		return jsonify({'result': 'Fail'})
-
-	del(data['region1'])
-	del(data['region2'])
-	del(data['region3'])
-	data['region_key'] = r['region_key']
-	
 	l = []
-	l.append(data['id'])
-	l.append(data['cate'])
-	l.append(data['name'])
-	l.append(data['family'])
-	l.append(data['dong'])
-	l.append(data['made_year'])
-	l.append(data['min_area'])
-	l.append(data['max_area'])
-	l.append(data['region_key'])
-	l.append(data['jibun1'])
-	l.append(data['jibun2'])
-	l.append(data['road_addr'])
+	for key in keys:
+		l.append(data[key])
+
 	t = tuple(l)
 	rows = -1
 	try:
@@ -605,12 +582,9 @@ def saveNaverComplexInfo():
 		cursor.close()
 	except Exception as e:
 		print(str(e))
-		print(data)
-		print(request.args.to_dict())
 		return jsonify({'result': 'Fail'})
 	finally:
 		connection.close()
 
-	print("saveNaverComplexInfo success : " + data['id'])
 	return jsonify({'result': 'OK'})
 
