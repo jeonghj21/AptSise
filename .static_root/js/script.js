@@ -368,7 +368,9 @@ function setValueOfParam(params, key, newValue) {
 				return;
 			}
 		}
-		input.val(newValue).change();
+		params[key] = newValue;
+		if (input.val() != newValue)
+			input.val(newValue).change();
 	}
 }
 
@@ -433,10 +435,13 @@ function changePriceGubun(gubun) {
 
 	// $('.price_text').text(gPriceGubun[parseInt(gubun)].title);
 	let priceGubun = PriceGubun.getPriceGubun(gubun);
+	
+	if (!myChart) return;
 
 	for(var i = 0; i < myChart['data']['datasets'].length; i++) {
 		let key = myChart['data']['datasets'][i].label;
 		chart = gChartData.get(key);
+		if (!chart) continue;
 		chart.params['price_gubun'] = gubun;
 	}
 
@@ -1187,6 +1192,7 @@ function clearChart() {
 		myChart = null;
 	}
 	gChartData.clear();
+
 	gCurChartType = CHART_TYPE.TIME_SERIES; // default chart type
 
 }
@@ -1777,7 +1783,14 @@ function drawRankChart(gubun, params) {
 
 		setPageNavigator(params, data);
 
-		gChartData.set(title, { 'data': data, 'params': params });
+		var copy_params = {};
+		for (var key in params) {
+			var item = params[key];
+			if (typeof(item) != "object")
+				copy_params[key] = item;
+		}
+
+		gChartData.set(title, { 'data': $.extend({}, data), 'params': copy_params });
 
 		//const priceGubun = gPriceGubun[parseInt(params['price_gubun'])];
 		const priceGubun = PriceGubun.getPriceGubun(params);
