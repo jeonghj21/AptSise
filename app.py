@@ -1,8 +1,12 @@
-from flask import Flask, request, render_template, json, jsonify
+from flask import Flask, request, render_template, jsonify
 from sqlalchemy import create_engine, text
-from json import JSONEncoder
-from datetime import date
-import datetime
+from datetime import date, datetime
+import logging
+import simplejson as json
+from dateutil.relativedelta import relativedelta
+
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 app = Flask(__name__)
 app.config.from_envvar('FLASK_CONFIG')
@@ -25,14 +29,13 @@ SELECT_LAST_BATCH = """
 
 @app.route("/")
 def index():
-	now = datetime.datetime.now()
+	now = datetime.now()
 	result = {}
 	try:
 		with app.engine.connect() as conn:
 			conn.execute(INSERT_ACCESS_LOG, ip=request.remote_addr, dt=now.strftime('%Y%m%d%H%M%S'))
 			res = conn.execute(text(SELECT_LAST_JOB))
 			for r in res:
-				print(r)
 				result['job_param'] = r['job_param']
 				result['job_key'] = r['job_key']
 				result['dt'] = r['dt']
@@ -123,7 +126,6 @@ def getAddConditions( params, required = {}, ignored = {} ):
 	if 'ages' in params and 'age_sign' in params and (len(required) == 0 or ('ages' in required and 'age_sign' in required)): 
 		add_conditions += " and " + str(date.today().year - int(params['ages'])) + params['age_sign'] + " made_year"
 
-	print("getAddConditions : " + add_conditions)
 	return add_conditions 
 
 SELECT_APT_SALE_LIST = "select b.apt_id, b.ym, cast(a.price as double) price, b.price ma, a.uprice uprice, b.uprice uma, a.cnt"
@@ -156,7 +158,6 @@ def getSale():
 	sql = SELECT_APT_SALE_LIST + " from (" + SELECT_APT_SALE_MA + add_conditions + SELECT_APT_SALE_MA_GROUP_BY + \
 		") b left outer join (" + SELECT_APT_SALE + add_conditions + SELECT_APT_SALE_GROUP_BY + ") a " + SELECT_APT_SALE_JOIN_ON 
 
-	print(sql)
 	with app.engine.connect() as connection:
 		result = connection.execute(text(sql), apt=apt)
 
@@ -236,7 +237,6 @@ def getSaleStat():
 
 	sql += " where a.ym = b.ym "
 	sql += " order by ym"
-	print(sql)
 	with app.engine.connect() as connection:
 		result = connection.execute(text(sql))
 
@@ -263,7 +263,6 @@ def getAptSale():
 	sql += " where apt_id = " + apt 
 	sql += getAddConditions(params, { 'base_ym', 'area_type' }, { 'danji' })
 	sql += " order by saled"
-	print(sql)
 	with app.engine.connect() as connection:
 		result = connection.execute(text(sql))
 
@@ -299,8 +298,6 @@ def getSaleStatTotal():
 	sql += getAddConditions(params, {})
 	sql += " ) a  group by ym"
 	sql += " order by ym"
-
-	print(sql)
 
 	with app.engine.connect() as connection:
 		result = connection.execute(text(sql))
@@ -360,7 +357,6 @@ def getRankCommon(request, sqlarr, requiredParams):
 	with app.engine.connect() as connection:
 		result = connection.execute(stmt)
 
-	print(sql + ", base_ym="+base_ym+", mm="+str(int(years)*12) + ", region="+region + ", rowcount="+str(result.rowcount))
 	json_data = { 'labels': [], 'rate':[], 'price':[], 'before_price':[], 'urate':[], 'uprice':[], 'before_uprice':[], 'has_more':False, 'region_key': [], 'apt': [] }
 	i = 0
 	for r in result:
@@ -587,4 +583,120 @@ def saveNaverComplexInfo():
 		connection.close()
 
 	return jsonify({'result': 'OK'})
+
+SELECT_1M_1Y_COMPARE_COMMON = """
+		  from apt_qbox_stats s, region_info r 
+		 where s.region_key = r.region_key 
+		   and r.upper_region = :region
+		   and s.ym = :ym
+		   and s.danji_flag = :danji 
+		   and s.price_gubun = :price_gubun
+		 group by s.region_key
+"""
+
+SELECT_1M_1Y_COMPARE_HEAD = """
+	select s1.region_key, s1.region_name
+		 , cur_uprice, cur_price, cur_cnt
+		 , before_1m_uprice, before_1m_price, before_1m_cnt
+		 , before_1y_uprice, before_1y_price, before_1y_cnt 
+		 , cast(substr(cur_max_uprice_id, 1, 12) as double) cur_max_uprice
+		 , cast(substr(cur_max_uprice_id, 13, 12) as signed integer) cur_max_uprice_id
+		 , cast(substr(cur_max_price_id, 1, 12) as double) cur_max_price
+		 , cast(substr(cur_max_price_id, 13, 12) as signed integer) cur_max_price_id
+		 , cast(substr(before_1m_max_uprice_id, 1, 12) as double) before_1m_max_uprice
+		 , cast(substr(before_1m_max_uprice_id, 13, 12) as signed integer) before_1m_max_uprice_id
+		 , cast(substr(before_1m_max_price_id, 1, 12) as double) before_1m_max_price
+		 , cast(substr(before_1m_max_price_id, 13, 12) as signed integer) before_1m_max_price_id
+		 , cast(substr(before_1y_max_uprice_id, 1, 12) as double) before_1y_max_uprice
+		 , cast(substr(before_1y_max_uprice_id, 13, 12) as signed integer) before_1y_max_uprice_id
+		 , cast(substr(before_1y_max_price_id, 1, 12) as double) before_1y_max_price
+		 , cast(substr(before_1y_max_price_id, 13, 12) as signed integer) before_1y_max_price_id
+	  from (
+"""
+SELECT_1M_1Y_COMPARE_ARR = ["""
+	  	select s.region_key, r.region_name
+			 , round(sum(avg_price*count)/sum(count),2) cur_uprice, sum(count) cur_cnt 
+			 , max(concat(lpad(max_price,12,'0'),lpad(max_sale_id,12,'0'))) cur_max_uprice_id
+""",
+"""
+	  ) s1, (
+	  	select s.region_key
+			 , round(sum(avg_price*count)/sum(count), 2) cur_price 
+			 , max(concat(lpad(max_price,12,'0'),lpad(max_sale_id,12,'0'))) cur_max_price_id
+""",
+"""
+	  ) s2, (
+	    select s.region_key
+			 , round(sum(avg_price*count)/sum(count), 2) before_1m_uprice, sum(count) before_1m_cnt 
+			 , max(concat(lpad(max_price,12,'0'),lpad(max_sale_id,12,'0'))) before_1m_max_uprice_id
+""",
+"""
+	  ) s3, (
+	  	select s.region_key
+			 , round(sum(avg_price*count)/sum(count), 2) before_1m_price
+			 , max(concat(lpad(max_price,12,'0'),lpad(max_sale_id,12,'0'))) before_1m_max_price_id
+""",
+"""
+	  ) s4, (
+	  	select s.region_key
+			 , round(sum(avg_price*count)/sum(count), 2) before_1y_uprice, sum(count) before_1y_cnt
+			 , max(concat(lpad(max_price,12,'0'),lpad(max_sale_id,12,'0'))) before_1y_max_uprice_id
+""",
+"""
+	  ) s5, (
+	  	select s.region_key
+			 , round(sum(avg_price*count)/sum(count), 2) before_1y_price
+			 , max(concat(lpad(max_price,12,'0'),lpad(max_sale_id,12,'0'))) before_1y_max_price_id
+"""]
+
+SELECT_1M_1Y_COMPARE_COMMON_TAIL = """
+	  ) s6 
+	  where s1.region_key = s2.region_key 
+	  	and s2.region_key = s3.region_key 
+		and s3.region_key = s4.region_key 
+		and s4.region_key = s5.region_key 
+		and s5.region_key = s6.region_key
+"""
+
+@app.route("/getCompareData")
+def getCompareData():
+
+	params = request.args.to_dict()
+	ym = params['to_ym']
+	danji = params['danji']
+	region = params['region_key']
+
+	ymarr = [":ym", ":ym", ":ym_1m", ":ym_1m", ":ym_1y", ":ym_1y"]
+	sql = SELECT_1M_1Y_COMPARE_HEAD
+	for i, t in enumerate(SELECT_1M_1Y_COMPARE_ARR):
+		sql_common = SELECT_1M_1Y_COMPARE_COMMON.replace(":price_gubun", ":price_gubun" + str((i % 2) + 1))
+		sql_common = sql_common.replace(":ym", ymarr[i])
+		sql = sql + t + sql_common
+
+	sql = sql + SELECT_1M_1Y_COMPARE_COMMON_TAIL
+	
+	ymd = datetime.strptime(ym+"01", "%Y%m%d")
+	ym_1m = (ymd - relativedelta(months=1)).strftime("%Y%m")
+	ym_1y = (ymd - relativedelta(years=1)).strftime("%Y%m")
+
+	with app.engine.connect() as connection:
+		result = connection.execute(text(sql), ym=ym, ym_1m=ym_1m, ym_1y=ym_1y, \
+									price_gubun1='1', price_gubun2='2', danji=danji, region=region)
+
+	rows=result.fetchall()            
+	json_data = {}
+	json_data['labels'] = []
+	for key in result.keys():
+		json_data[key] = []
+
+	for res in rows:
+		json_data['labels'].append(res['region_name'])
+		for key in json_data:
+			if key == "labels":
+				continue
+			json_data[key].append(res[key])
+
+	json_return=json.dumps(json_data)   #string #json
+ 
+	return jsonify(json_return)
 
