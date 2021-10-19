@@ -279,6 +279,7 @@ insert into apt_qbox_stats
 			 , cast(substr(min_price_id, 1, 12) as double)
 			 , cast(substr(min_price_id, 13, 12) as signed integer)
 			 , 1q_price, 3q_price, med_price, avg_price
+			 , count
 """
 
 INSERT_QBOX_STATS = [
@@ -302,7 +303,8 @@ INSERT_QBOX_STATS = [
 							group_concat(price/(area/3.3) order by price/(area/3.3) asc separator ',')
 									, ',', (((75 / 100) * count(0)) + 1))
 							,',',-1) as 3q_price
-				 , round(avg(price), 2) avg_price
+				 , round(avg(price/(area/3.3)), 2) avg_price
+				 , count(0) count
 """,
 """
 		  from (             
@@ -325,6 +327,7 @@ INSERT_QBOX_STATS = [
 								, ',', (((75 / 100) * count(0)) + 1))
 						,',',-1) as 3q_price
 				 , round(avg(price), 2) avg_price
+				 , count(0) count
 """
 ]
 

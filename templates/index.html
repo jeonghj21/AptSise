@@ -52,6 +52,25 @@ $(document).ready(function(){
 		$('.popup').hide();
 	});
 
+	const sel = document.getElementById('chartHist');
+
+	sel.addEventListener('change', (event) => {
+		let key_arr = sel.options[sel.selectedIndex].value.split('$');
+		let chart = gChartData.get(key_arr[0]);
+		switch(chart.type) {
+		case CHART_TYPE.TIME_SERIES:
+			drawNewChart(key_arr[0], chart.data, chart.params);
+			break;
+		case CHART_TYPE.RANK_REGION:
+		case CHART_TYPE.RANK_APT:
+			drawRankChartBase(key_arr[0], chart.data, chart.params, chart.type.gubun);
+			break;
+		case CHART_TYPE.COMPARE:
+			drawCompareChart(key_arr[0], chart.data, chart.params);
+			break;
+		}
+	});
+
 	showMessage('초기화');
 	$.getJSON("{{ config['BASE_URL'] }}getRegions", function(data){
 		let regions = JSON.parse(data);
@@ -71,6 +90,17 @@ $(document).ready(function(){
 			upper['subregions'].push(region);
 		}
 		initRegions();
+		let interestRegion = getCookie(gCookie_Region);
+		if (interestRegion == "") {
+			interestRegion = regions[1].key;
+			setCookie(gCookie_Region, interestRegion, 100);
+		}
+		let regions_arr = interestRegion.split("|");
+		let params = getChartParams();
+		for(let i = 0; i < regions_arr.length; i++) {
+			params['region_key' + (i+1)] = regions_arr[i];
+		}
+		requestRankChart('Region');
 		closeMessage();
 	});
 	
