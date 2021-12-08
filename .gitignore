@@ -13,3 +13,4 @@ dump*.sql
 data/*.sql
 *.log.*
 update_dev.sh
+git_token.txt
