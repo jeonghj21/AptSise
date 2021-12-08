@@ -723,7 +723,7 @@ class ChartManager {
 
 	static existsInCurChart(title) {
 		for (let i = 0; i < ChartWrapper.sMainChart.data.datasets.length; i++) {
-			if ChartWrapper.sMainChart.data.datasets[i].label == title)
+			if (ChartWrapper.sMainChart.data.datasets[i].label == title)
 				return true;
 		}
 
