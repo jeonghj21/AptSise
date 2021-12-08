@@ -721,6 +721,15 @@ class ChartManager {
 	
 	}
 
+	static existsInCurChart(title) {
+		for (let i = 0; i < ChartWrapper.sMainChart.data.datasets.length; i++) {
+			if ChartWrapper.sMainChart.data.datasets[i].label == title)
+				return true;
+		}
+
+		return false;
+	}
+
 }
 
 const CHART_TYPE = {
@@ -2105,7 +2114,7 @@ function drawSaleLineChart(params) {
 	let chartType = ChartManager.setChartType(params, CHART_TYPE.TIME_SERIES_APT);
 	let title = chartType.title(params);
 
-	if (ChartManager.isDrawOverlap() && ChartManager.getChartInfo(title)) {
+	if (ChartManager.isDrawOverlap() && ChartManager.existsInCurChart(title)) {
 		alert("이미 있는 차트입니다.");
 		return;
 	}
@@ -2223,7 +2232,7 @@ function drawSaleStat(params) {
 	let chartType = ChartManager.getChartType(params);
 	let title = chartType.title(params);
 
-	if (ChartManager.isDrawOverlap() && ChartManager.getChartInfo(title)) {
+	if (ChartManager.isDrawOverlap() && ChartManager.existsInCurChart(title)) {
 		alert("이미 있는 차트입니다.");
 		return;
 	}
