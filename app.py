@@ -48,7 +48,7 @@ def index():
 	except Exception as e:
 		print(str(e))
 
-	return render_template('index.html', result=result, dt=now.timestamp(), version=app.config['VERSION'])
+	return render_template('index.html', result=result, dt=now.timestamp(), version=app.config['VERSION'], version_dt=app.config['VERSION_DT'])
 
 def spreadDataForYM(rows, ym_label, labels, data_list):
 	if len(rows) == 0:

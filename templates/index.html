@@ -3,104 +3,96 @@
 <meta http-equiv="Expires" content="-1">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
-<link rel="stylesheet" type="text/css" href="static/style.css?dt={{dt}}">
+{% include 'svg-style.html' %}
+<link rel="stylesheet" type="text/css" href="static/style-layout.css?dt={{dt}}">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="/static/js/jquery-3.6.0.min.js"></script>
 <script src="/static/js/script.js?dt={{dt}}" charset="UTF-8"></script>
 </head>
-{% include 'container.html' %}
-<div style='width:100%; margin:20px;'>
-	<div id="map" style="width:100%; height: 100vh; display:none;"></div>
-	<div id="chartLegend" class="chart-btn-container"></div>
-    <canvas id="myChart"></canvas>
+<body>
+{% include 'top-nav.html' %}
+<div id="layoutSidenav">
+{% include 'sidebar.html' %}
+	<div id="layoutSidenav_content">
+		<main>
+			<div class="container-fluid px-4">
+				<div id="fade" class="black_background"></div>
+				<div id="light" class="white_content">
+					<div style="font-size:24px;color:red;">
+						<center><span id=task>조회</span>중입니다.<br/>잠시만 기다리세요.</center>
+					</div>
+				</div>
+				<div id="map" style="width:100%; height: 100vh; display:none;"></div>
+				<div id="chartLegend" class="chart-btn-container"></div>
+				<canvas id="myChart"></canvas>
+			</div>
+		</main>
+		<footer class="py-4 bg-light mt-auto">
+			<div class="container-fluid px-4">
+				<div class="d-flex align-items-center justify-content-between small">
+					<div class="text-muted">Copyright © Your Website 2021</div>
+				</div>
+			</div>
+		</footer>
+	</div>
 </div>
-<div id="aptSaleDiv" class="floating-list popup">
-<table id="aptSaleTable">
-<thead>
-<tr class="aptSaleListHeader" >
-	<th class="aptSaleListItem" style="width:100px;">날짜</th>
-	<th class="aptSaleListItem" style="width:150px;">전용면적(m<sup>2</sup>)</th>
-	<th class="aptSaleListItem" style="width:30px;">층</th>
-	<th class="aptSaleListItem" style="width:120px;">총금액(만원)</th>
-	<th class="aptSaleListItem" style="width:120px;">평단가(만원)</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
-</div>
+{% include 'hidden_divs.html' %}
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=816341078d92b651522a5cfccdf56dfe&libraries=services"></script>
 <script>
 BASE_URL = "{{ config['BASE_URL'] }}";
-$(document).ready(function(){ 
+
+document.addEventListener("DOMContentLoaded", function() {
+
+	// Toggle the side navigation
+    const sidebarToggle = document.body.querySelector('#sidebarToggle');
+    if (sidebarToggle) {
+        // Uncomment Below to persist sidebar toggle between refreshes
+        // if (localStorage.getItem('sb|sidebar-toggle') === 'true') {
+        //     document.body.classList.toggle('sb-sidenav-toggled');
+        // }
+        sidebarToggle.addEventListener('click', event => {
+            event.preventDefault();
+            document.body.classList.toggle('sb-sidenav-toggled');
+            localStorage.setItem('sb|sidebar-toggle', document.body.classList.contains('sb-sidenav-toggled'));
+        });
+    }
 
 	initSelectYMTable();
 
-	initDrawOptionsMap();
+	ChartManager.init();
 
 	var html = "";
 	const priceGubunArr = PriceGubun.getAllPriceGubun();
 	for(var i=0; i<priceGubunArr.length; i++) {
 		html += "<option value=" + i + ">"+priceGubunArr[i].title+"</option>";
 	}
-	$('#price_gubun').html(html);
-	$('.price_text').text(priceGubunArr[0].title);
+	document.getElementById('price_gubun').innerHTML = html;
+	let elems = document.getElementsByClassName('price_text');
+	Array.from(elems).forEach(elem => elem.innerText = priceGubunArr[0].title);
 
 	setErrorHandler();
 
 	// hide any popup div at uncaptured click event
-	$(window).click(function(e) {
-		$('.popup').hide();
-	});
-
-	const sel = document.getElementById('chartHist');
-
-	sel.addEventListener('change', (event) => {
-		let key_arr = sel.options[sel.selectedIndex].value.split('$');
-		let chart = gChartData.get(key_arr[0]);
-		switch(chart.type) {
-		case CHART_TYPE.TIME_SERIES:
-			drawNewChart(key_arr[0], chart.data, chart.params);
-			break;
-		case CHART_TYPE.RANK_REGION:
-		case CHART_TYPE.RANK_APT:
-			drawRankChartBase(key_arr[0], chart.data, chart.params, chart.type.gubun);
-			break;
-		case CHART_TYPE.COMPARE:
-			drawCompareChart(key_arr[0], chart.data, chart.params);
-			break;
-		}
+	window.addEventListener("click", function(e) {
+		let elems = document.getElementsByClassName('popup');
+		Array.from(elems).forEach(elem => elem.style.visibility = 'hidden');
 	});
 
 	showMessage('초기화');
 	$.getJSON("{{ config['BASE_URL'] }}getRegions", function(data){
 		let regions = JSON.parse(data);
-		for (var i = 0; i < regions.length; i++) {
-			const region = regions[i];
-			gRegionsMap[region['key']] = region;
-			let level = region['level'];
-			if (level == 0)
-				continue;
-			if (level == 1)
-				gRegionsArr.push(region);
-			if (level > 1 && region['apt_yn'] != 'Y')
-				continue;
-			let upper = gRegionsMap[region['upper']];
-			if (!upper['subregions'])
-				upper['subregions'] = [];
-			upper['subregions'].push(region);
-		}
-		initRegions();
+		initRegions(regions);
 		let interestRegion = getCookie(gCookie_Region);
 		if (interestRegion == "") {
 			interestRegion = regions[1].key;
 			setCookie(gCookie_Region, interestRegion, 100);
 		}
 		let regions_arr = interestRegion.split("|");
-		let params = getChartParams();
+		let params = ChartManager.getChartParams();
 		for(let i = 0; i < regions_arr.length; i++) {
 			params['region_key' + (i+1)] = regions_arr[i];
 		}
-		requestRankChart('Region');
+		requestSaleStat();
 		closeMessage();
 	});
 	
@@ -108,4 +100,4 @@ $(document).ready(function(){
 
 });
 </script>
-{% include 'bottom.html' %}
+</body>
